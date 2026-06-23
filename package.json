@@ -1,0 +1,37 @@
+{
+  "name": "strategy-desk",
+  "version": "3.0.0",
+  "description": "Strategy Desk — autonomous, backtested trade-setup engine with an annotated chart and a Gemini-powered Desk chat.",
+  "main": "./out/main/index.js",
+  "author": "Strategy Desk",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "electron-vite build",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "rebuild": "electron-builder install-app-deps",
+    "package": "electron-vite build && electron-builder install-app-deps && electron-builder"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "better-sqlite3": "^11.8.1",
+    "lightweight-charts": "^4.2.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.1",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.3",
+    "vite": "^5.4.14"
+  }
+}

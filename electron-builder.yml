@@ -1,0 +1,18 @@
+appId: com.strategydesk.app
+productName: Strategy Desk
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+mac:
+  target: dmg
+  category: public.app-category.finance
+win:
+  target: nsis
+linux:
+  target: AppImage
+  category: Office
