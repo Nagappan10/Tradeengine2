@@ -49,6 +49,19 @@ npm run package     # builds + electron-builder for your current OS
 
 Outputs to `release/` (AppImage on Linux, dmg on macOS, nsis on Windows).
 
+#### Windows installer via CI (no local toolchain needed)
+
+A Windows `.exe` installer is built on a real Windows runner by the
+**Build Windows installer** GitHub Action (`.github/workflows/release.yml`):
+
+1. Push a tag like `v3.0.0`, or open the repo's **Actions** tab → *Build Windows
+   installer* → **Run workflow**.
+2. When it finishes, open the run and download the
+   **StrategyDesk-Windows-Installer** artifact (a zip containing
+   `Strategy Desk Setup <version>.exe`).
+3. Unzip and run the installer. (It's unsigned, so Windows SmartScreen may warn —
+   choose *More info → Run anyway*.)
+
 ## Where keys & data live
 
 - **Keys** (Gemini, optional Alpaca / Twelve Data) are entered in **Settings**

@@ -1,0 +1,41 @@
+name: Build Windows installer
+
+# Builds a double-click Windows installer (.exe) on a real Windows runner and
+# uploads it as a downloadable artifact. Trigger by pushing a v* tag, or run it
+# manually from the Actions tab (Run workflow).
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (renderer + main + preload)
+        run: npm run build
+
+      - name: Package NSIS installer
+        run: npx --no-install electron-builder --win nsis --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StrategyDesk-Windows-Installer
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+          if-no-files-found: error
