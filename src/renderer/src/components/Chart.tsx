@@ -72,7 +72,8 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
       height: hostRef.current.clientHeight,
       layout: { background: { color: c.bg }, textColor: c.text, fontFamily: 'SF Mono, Menlo, monospace' },
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
-      rightPriceScale: { borderColor: c.grid },
+      leftPriceScale: { visible: true, borderColor: c.grid },
+      rightPriceScale: { visible: false },
       timeScale: { borderColor: c.grid, timeVisible: true, secondsVisible: false, rightOffset: 6 },
       crosshair: { mode: 0 }
     })
@@ -82,15 +83,16 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
       borderUpColor: c.up,
       borderDownColor: c.down,
       wickUpColor: c.up,
-      wickDownColor: c.down
+      wickDownColor: c.down,
+      priceScaleId: 'left'
     })
     // Volume on its own scale pinned to the bottom 18% of the pane.
     const vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } })
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
-    const emaFast = chart.addLineSeries({ color: c.amber, lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
-    const emaSlow = chart.addLineSeries({ color: '#6aa0d8', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
-    const bbUp = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false })
-    const bbLo = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false })
+    const emaFast = chart.addLineSeries({ color: c.amber, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, priceScaleId: 'left' })
+    const emaSlow = chart.addLineSeries({ color: '#6aa0d8', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, priceScaleId: 'left' })
+    const bbUp = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, priceScaleId: 'left' })
+    const bbLo = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, priceScaleId: 'left' })
 
     chartRef.current = chart
     seriesRef.current = series
@@ -127,7 +129,7 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
     chart.applyOptions({
       layout: { background: { color: c.bg }, textColor: c.text },
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
-      rightPriceScale: { borderColor: c.grid },
+      leftPriceScale: { borderColor: c.grid },
       timeScale: { borderColor: c.grid }
     })
     series.applyOptions({

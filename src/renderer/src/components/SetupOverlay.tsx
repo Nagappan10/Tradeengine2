@@ -59,8 +59,10 @@ export default function SetupOverlay({ chartRef, version, setup, zones, trendlin
 
     if (!setup) return { width, height, zoneRects, setupGeom: null, tlSegs, drawSegs }
 
-    const projX = Math.round(width * 0.52)
-    const projW = Math.max(20, width - projX - 64)
+    // Project the R:R boxes in the left-centre so the floating glass panel on the
+    // right doesn't hide them.
+    const projX = Math.round(width * 0.32)
+    const projW = Math.round(width * 0.28)
     const setupGeom = {
       yEntry: clamp(api.priceToY(setup.entryPrice)),
       yStop: clamp(api.priceToY(setup.stopPrice)),

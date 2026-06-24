@@ -65,6 +65,7 @@ export default function App() {
   }, [symbol, interval, load])
 
   const [streaming, setStreaming] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)
   const [tool, setTool] = useState<DrawTool>('none')
   const [drawings, setDrawings] = useState<Drawing[]>([])
   const [pending, setPending] = useState<{ t: number; p: number } | null>(null)
@@ -291,7 +292,16 @@ export default function App() {
           )}
         </div>
 
-        <div className="side">
+        <button
+          className="panel-handle"
+          style={{ right: panelOpen ? 366 : 14 }}
+          onClick={() => setPanelOpen((o) => !o)}
+          title={panelOpen ? 'Hide panel (show full chart)' : 'Show panel'}
+        >
+          {panelOpen ? '›' : '‹'}
+        </button>
+
+        <div className={`side ${panelOpen ? '' : 'collapsed'}`}>
           <SetupPanel
             setups={analysis?.promotedSetups ?? []}
             diagnostics={

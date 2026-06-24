@@ -287,20 +287,15 @@ select:focus {
 .body {
   flex: 1;
   position: relative;
-  display: flex;
-  gap: 14px;
-  padding: 14px;
   min-height: 0;
 }
 
+/* Chart fills the whole body; the glass panel floats over its right edge so the
+   candles show through the frosted glass (price axis is on the left, uncovered). */
 .chart-host {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  border-radius: var(--radius);
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2), var(--glass-shadow);
 }
 
 .live-dot {
@@ -348,7 +343,7 @@ select:focus {
 .indicator-bar {
   position: absolute;
   top: 12px;
-  right: 14px;
+  right: 374px;
   z-index: 6;
   display: flex;
   gap: 4px;
@@ -516,14 +511,42 @@ button.tiny {
 /* ---------------- floating glass side panel ---------------- */
 
 .side {
-  width: 344px;
-  flex: 0 0 344px;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
+  width: 340px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding: 2px;
   z-index: 10;
+  transition: transform 0.38s cubic-bezier(0.21, 0.61, 0.35, 1), opacity 0.3s ease;
+}
+.side.collapsed {
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* handle to slide the panel away / back, revealing the full chart */
+.panel-handle {
+  position: absolute;
+  top: 68px;
+  z-index: 11;
+  width: 26px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--panel);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  transition: right 0.38s cubic-bezier(0.21, 0.61, 0.35, 1);
 }
 
 .glass {
@@ -841,12 +864,13 @@ button.tiny {
 }
 
 @media (max-width: 900px) {
-  .body {
-    flex-direction: column;
-  }
   .side {
-    width: 100%;
-    flex: none;
+    left: 14px;
+    width: auto;
+    top: auto;
     height: 46%;
+  }
+  .indicator-bar {
+    right: 14px;
   }
 }
