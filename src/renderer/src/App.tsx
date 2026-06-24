@@ -81,18 +81,28 @@ export default function App() {
   useEffect(() => {
     let unsub: (() => void) | null = null
     let cancelled = false
+    let gotData = false
     setStreaming(false)
+
     window.desk.subscribeStream(symbol, interval).then((active) => {
       if (cancelled) return
       setStreaming(active)
       setLive(active)
     })
     unsub = window.desk.onStreamCandle((candle) => {
+      gotData = true
       applyLiveBar(candle)
       setLive(true)
     })
+    // Watchdog: if the socket connects but delivers nothing (blocked / non-crypto),
+    // drop back to quote polling instead of leaving the chart frozen.
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled && !gotData) setStreaming(false)
+    }, 8000)
+
     return () => {
       cancelled = true
+      window.clearTimeout(watchdog)
       if (unsub) unsub()
       window.desk.unsubscribeStream()
     }
