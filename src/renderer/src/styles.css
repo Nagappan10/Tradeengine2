@@ -324,6 +324,64 @@ select:focus {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
+.indicator-bar {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 6;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.indicator-bar button {
+  font-size: 11px;
+  padding: 4px 9px;
+  border: none;
+  background: transparent;
+  color: var(--bone-dim);
+  box-shadow: none;
+  transform: none;
+}
+.indicator-bar button:hover {
+  background: transparent;
+  color: var(--bone);
+  box-shadow: none;
+}
+.indicator-bar button.active {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+button.tiny {
+  font-size: 11px;
+  padding: 4px 9px;
+}
+
+.ml-bar {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--panel-2);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+.ml-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--bear), var(--amber) 50%, var(--bull));
+  transition: width 0.4s ease;
+}
+
 .overlay {
   position: absolute;
   inset: 0;

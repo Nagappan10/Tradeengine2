@@ -1,5 +1,5 @@
 import type { Candle, MlSignal } from '@shared/types'
-import { rsi, macd, atr } from './indicators'
+import { rsi, macd, atr } from '@shared/indicators'
 
 // A disciplined, intentionally-simple secondary signal: logistic regression on
 // engineered features, trained chronologically (no leakage), reported against a

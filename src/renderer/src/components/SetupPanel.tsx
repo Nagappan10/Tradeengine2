@@ -6,6 +6,8 @@ interface Props {
   diagnostics: ResearchDiagnostics
   selectedId: string | null
   onSelect(id: string): void
+  onResearch(): void
+  researching: boolean
   loading: boolean
 }
 
@@ -18,7 +20,15 @@ function StatRow({ k, v }: { k: string; v: string }) {
   )
 }
 
-export default function SetupPanel({ firing, diagnostics, selectedId, onSelect, loading }: Props) {
+export default function SetupPanel({
+  firing,
+  diagnostics,
+  selectedId,
+  onSelect,
+  onResearch,
+  researching,
+  loading
+}: Props) {
   const [openStats, setOpenStats] = useState<Record<string, boolean>>({})
 
   if (loading) {
@@ -34,7 +44,14 @@ export default function SetupPanel({ firing, diagnostics, selectedId, onSelect, 
 
   return (
     <div className="glass">
-      <h3 className="section-title">Firing setups</h3>
+      <div className="panel-head">
+        <h3 className="section-title" style={{ margin: 0 }}>
+          Firing setups
+        </h3>
+        <button className="tiny" onClick={onResearch} disabled={researching}>
+          {researching ? 'Researching…' : '⟳ Run research'}
+        </button>
+      </div>
 
       {firing.length === 0 ? (
         <div className="diag">

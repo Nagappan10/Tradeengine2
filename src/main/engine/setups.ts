@@ -1,7 +1,7 @@
 import type { Candle, Direction, EntryTrigger, Interval, Setup, Zone } from '@shared/types'
 import { detectSwings } from './swings'
 import { detectZones, nearestZone, ZoneParams } from './zones'
-import { ema } from './indicators'
+import { ema } from '@shared/indicators'
 
 // A template is the testable rule that produces concrete entry/stop/target prices.
 // It is evaluated bar-by-bar with ONLY the data available up to that bar (no lookahead).

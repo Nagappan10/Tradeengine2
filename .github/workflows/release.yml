@@ -11,6 +11,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -41,3 +44,17 @@ jobs:
             release/*.exe
             release/*.exe.blockmap
           if-no-files-found: error
+
+      # Publish a permanent GitHub Release with the installer attached, so there's
+      # a stable download link that doesn't expire like a 90-day artifact.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: win-build-${{ github.run_number }}
+          name: Strategy Desk (Windows) build ${{ github.run_number }}
+          body: |
+            Windows installer for Strategy Desk, built from `${{ github.sha }}`.
+            Download `Strategy.Desk.Setup.*.exe` below. It's unsigned — on SmartScreen choose **More info → Run anyway**.
+          files: |
+            release/*.exe
+          fail_on_unmatched_files: true

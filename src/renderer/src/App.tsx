@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Candle, DeskContext, Interval, MaskedSettings, SymbolAnalysis } from '@shared/types'
-import Chart, { ChartHandle } from './components/Chart'
+import Chart, { ChartHandle, Overlays } from './components/Chart'
 import SetupOverlay from './components/SetupOverlay'
 import SetupPanel from './components/SetupPanel'
+import SignalsCard from './components/SignalsCard'
+import IndicatorBar from './components/IndicatorBar'
 import DeskChat from './components/DeskChat'
 import TopBar from './components/TopBar'
 import SettingsModal from './components/SettingsModal'
@@ -23,6 +25,8 @@ export default function App() {
   const [version, setVersion] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [live, setLive] = useState(false)
+  const [researching, setResearching] = useState(false)
+  const [overlays, setOverlays] = useState<Overlays>({ ema: true, bb: false, volume: true })
 
   const chartRef = useRef<ChartHandle>(null)
   const fitKey = `${symbol}|${interval}`
@@ -132,6 +136,21 @@ export default function App() {
     window.desk.saveSettings({ theme: next })
   }
 
+  const runResearch = async () => {
+    if (researching) return
+    setResearching(true)
+    try {
+      await window.desk.runResearch(symbol, interval)
+      await load(symbol, interval)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setResearching(false)
+    }
+  }
+
+  const toggleOverlay = (key: keyof Overlays) => setOverlays((o) => ({ ...o, [key]: !o[key] }))
+
   const lastPrice = candles.length ? candles[candles.length - 1].close : null
 
   return (
@@ -166,7 +185,15 @@ export default function App() {
               loading…
             </div>
           )}
-          <Chart ref={chartRef} candles={candles} theme={theme} onViewport={onViewport} fitKey={fitKey} />
+          <IndicatorBar overlays={overlays} onToggle={toggleOverlay} />
+          <Chart
+            ref={chartRef}
+            candles={candles}
+            theme={theme}
+            overlays={overlays}
+            onViewport={onViewport}
+            fitKey={fitKey}
+          />
           <SetupOverlay chartRef={chartRef} version={version} setup={selectedSetup} />
         </div>
 
@@ -185,8 +212,11 @@ export default function App() {
             }
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onResearch={runResearch}
+            researching={researching}
             loading={loading}
           />
+          <SignalsCard ml={analysis?.ml ?? null} decay={analysis?.decay ?? []} />
           <DeskChat ctx={deskCtx} />
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { Candle } from '@shared/types'
+import { bollinger, ema } from '@shared/indicators'
 
 export interface ChartHandle {
   priceToY(price: number): number | null
@@ -8,23 +9,35 @@ export interface ChartHandle {
   size(): { width: number; height: number }
 }
 
+export interface Overlays {
+  ema: boolean
+  bb: boolean
+  volume: boolean
+}
+
 interface Props {
   candles: Candle[]
   theme: 'dark' | 'light'
+  overlays: Overlays
   onViewport(): void
-  fitKey: string // changes when symbol/interval changes -> refit; stays stable on live ticks
+  fitKey: string
 }
 
 function palette(theme: 'dark' | 'light') {
   return theme === 'dark'
-    ? { bg: '#14130F', text: '#9a9485', grid: 'rgba(58,53,42,0.4)', up: '#5FB99A', down: '#E06C5E' }
-    : { bg: '#F4F1E9', text: '#6c6555', grid: 'rgba(216,209,191,0.6)', up: '#2f8f6e', down: '#c0493b' }
+    ? { bg: '#14130F', text: '#9a9485', grid: 'rgba(58,53,42,0.4)', up: '#5FB99A', down: '#E06C5E', amber: '#E8A33D', dim: '#9a9485' }
+    : { bg: '#F4F1E9', text: '#6c6555', grid: 'rgba(216,209,191,0.6)', up: '#2f8f6e', down: '#c0493b', amber: '#c47d18', dim: '#6c6555' }
 }
 
-const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitKey }, ref) => {
+const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onViewport, fitKey }, ref) => {
   const hostRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const emaFastRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const emaSlowRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const bbUpRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const bbLoRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const volRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const lastFitKey = useRef<string>('')
   const themeRef = useRef(theme)
   themeRef.current = theme
@@ -41,8 +54,6 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitK
     size: () => ({ width: hostRef.current?.clientWidth ?? 0, height: hostRef.current?.clientHeight ?? 0 })
   }))
 
-  // Create the chart ONCE. Theme + data are applied by the effects below, so a
-  // theme toggle never tears down the series (which previously blanked the candles).
   useEffect(() => {
     if (!hostRef.current) return
     const c = palette(themeRef.current)
@@ -63,8 +74,21 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitK
       wickUpColor: c.up,
       wickDownColor: c.down
     })
+    // Volume on its own scale pinned to the bottom 18% of the pane.
+    const vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } })
+    vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
+    const emaFast = chart.addLineSeries({ color: c.amber, lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+    const emaSlow = chart.addLineSeries({ color: '#6aa0d8', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+    const bbUp = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false })
+    const bbLo = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false })
+
     chartRef.current = chart
     seriesRef.current = series
+    volRef.current = vol
+    emaFastRef.current = emaFast
+    emaSlowRef.current = emaSlow
+    bbUpRef.current = bbUp
+    bbLoRef.current = bbLo
 
     const fire = () => onViewport()
     chart.timeScale().subscribeVisibleTimeRangeChange(fire)
@@ -84,7 +108,7 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitK
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Apply theme colours live, without recreating the chart.
+  // theme
   useEffect(() => {
     const chart = chartRef.current
     const series = seriesRef.current
@@ -104,24 +128,40 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitK
       wickUpColor: c.up,
       wickDownColor: c.down
     })
+    emaFastRef.current?.applyOptions({ color: c.amber })
+    bbUpRef.current?.applyOptions({ color: c.dim })
+    bbLoRef.current?.applyOptions({ color: c.dim })
     onViewport()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme])
 
-  // Push data on every change (including live ticks). Only refit the viewport when
-  // the symbol/interval changes, so live updates don't yank the user's zoom/pan.
+  // data + indicators
   useEffect(() => {
     const series = seriesRef.current
     if (!series) return
     series.setData(
-      candles.map((c) => ({
-        time: c.time as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close
+      candles.map((k) => ({ time: k.time as UTCTimestamp, open: k.open, high: k.high, low: k.low, close: k.close }))
+    )
+    const c = palette(themeRef.current)
+    const times = candles.map((k) => k.time as UTCTimestamp)
+    const closes = candles.map((k) => k.close)
+
+    volRef.current?.setData(
+      candles.map((k) => ({
+        time: k.time as UTCTimestamp,
+        value: k.volume,
+        color: (k.close >= k.open ? c.up : c.down) + '66'
       }))
     )
+    const setLine = (s: ISeriesApi<'Line'> | null, vals: (number | null)[]) =>
+      s?.setData(times.map((t, i) => ({ time: t, value: vals[i] })).filter((p) => p.value != null) as { time: UTCTimestamp; value: number }[])
+
+    setLine(emaFastRef.current, ema(closes, 20))
+    setLine(emaSlowRef.current, ema(closes, 50))
+    const bb = bollinger(closes, 20, 2)
+    setLine(bbUpRef.current, bb.upper)
+    setLine(bbLoRef.current, bb.lower)
+
     if (fitKey !== lastFitKey.current) {
       chartRef.current?.timeScale().fitContent()
       lastFitKey.current = fitKey
@@ -129,6 +169,15 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitK
     onViewport()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candles, fitKey])
+
+  // toggle indicator visibility
+  useEffect(() => {
+    emaFastRef.current?.applyOptions({ visible: overlays.ema })
+    emaSlowRef.current?.applyOptions({ visible: overlays.ema })
+    bbUpRef.current?.applyOptions({ visible: overlays.bb })
+    bbLoRef.current?.applyOptions({ visible: overlays.bb })
+    volRef.current?.applyOptions({ visible: overlays.volume })
+  }, [overlays])
 
   return <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />
 })
