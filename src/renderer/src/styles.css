@@ -2,8 +2,8 @@
   /* Dark terminal identity (default) */
   --bg: #14130f;
   --bg-2: #100f0c;
-  --panel: rgba(28, 26, 21, 0.55);
-  --panel-2: rgba(35, 33, 26, 0.6);
+  --panel: rgba(28, 26, 21, 0.38);
+  --panel-2: rgba(35, 33, 26, 0.46);
   --panel-solid: #1c1a15;
   --line: #3a352a;
   --bone: #ede7d8;
@@ -12,10 +12,10 @@
   --amber-soft: rgba(232, 163, 61, 0.16);
   --bull: #5fb99a;
   --bear: #e06c5e;
-  --glass-border: rgba(237, 231, 216, 0.14);
-  --glass-sheen: rgba(237, 231, 216, 0.08);
-  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
-  --glass-blur: 18px;
+  --glass-border: rgba(237, 231, 216, 0.16);
+  --glass-sheen: rgba(237, 231, 216, 0.1);
+  --glass-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --glass-blur: 22px;
   --radius: 16px;
   --radius-sm: 10px;
 }
@@ -23,8 +23,8 @@
 :root[data-theme='light'] {
   --bg: #f4f1e9;
   --bg-2: #ece7da;
-  --panel: rgba(255, 253, 247, 0.58);
-  --panel-2: rgba(247, 243, 233, 0.66);
+  --panel: rgba(255, 253, 247, 0.42);
+  --panel-2: rgba(247, 243, 233, 0.5);
   --panel-solid: #fffdf7;
   --line: #d8d1bf;
   --bone: #2b2820;
@@ -57,26 +57,38 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Ambient drifting glow behind the floating glass panels. */
+/* Ambient drifting colour wash behind the glass panels — this is what the frosted
+   panels refract, so it's deliberately vivid (esp. down the right where the panel sits). */
 body::before {
   content: '';
   position: fixed;
-  inset: -20%;
+  inset: -25%;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(420px 420px at 82% 18%, var(--amber-soft), transparent 70%),
-    radial-gradient(520px 520px at 92% 78%, rgba(95, 185, 154, 0.12), transparent 70%),
-    radial-gradient(400px 400px at 70% 50%, rgba(224, 108, 94, 0.08), transparent 70%);
-  filter: blur(8px);
-  animation: drift 24s ease-in-out infinite alternate;
+    radial-gradient(620px 620px at 86% 12%, rgba(232, 163, 61, 0.38), transparent 68%),
+    radial-gradient(700px 700px at 96% 72%, rgba(95, 185, 154, 0.32), transparent 70%),
+    radial-gradient(560px 560px at 74% 46%, rgba(224, 108, 94, 0.26), transparent 70%),
+    radial-gradient(520px 520px at 64% 92%, rgba(120, 150, 220, 0.22), transparent 72%);
+  filter: blur(10px);
+  animation: drift 22s ease-in-out infinite alternate;
+}
+:root[data-theme='light'] body::before {
+  background:
+    radial-gradient(620px 620px at 86% 12%, rgba(196, 125, 24, 0.3), transparent 68%),
+    radial-gradient(700px 700px at 96% 72%, rgba(47, 143, 110, 0.26), transparent 70%),
+    radial-gradient(560px 560px at 74% 46%, rgba(192, 73, 59, 0.2), transparent 70%),
+    radial-gradient(520px 520px at 64% 92%, rgba(90, 120, 200, 0.2), transparent 72%);
 }
 @keyframes drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
   }
+  50% {
+    transform: translate3d(-2%, -2%, 0) scale(1.06);
+  }
   100% {
-    transform: translate3d(-3%, 2%, 0) scale(1.08);
+    transform: translate3d(-4%, 3%, 0) scale(1.12);
   }
 }
 
@@ -261,6 +273,15 @@ select:focus {
 
 .spacer {
   flex: 1;
+}
+
+.build-tag {
+  font-size: 10px;
+  color: var(--bone-dim);
+  padding: 3px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--glass-border);
+  background: var(--panel-2);
 }
 
 .body {

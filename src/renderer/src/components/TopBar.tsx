@@ -95,6 +95,10 @@ export default function TopBar({
 
       <div className="spacer" />
 
+      <span className="build-tag mono" title="Build version — compare with the GitHub Release you installed">
+        v3.0 · {__APP_BUILD__}
+      </span>
+
       <button onClick={onToggleTheme} title="Toggle theme">
         {theme === 'dark' ? '☾ dark' : '☀ light'}
       </button>
