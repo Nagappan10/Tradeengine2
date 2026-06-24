@@ -1,12 +1,6 @@
-import {
-  CandlestickSeriesPartialOptions,
-  createChart,
-  IChartApi,
-  ISeriesApi,
-  UTCTimestamp
-} from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import type { Candle, Trade } from '@shared/types'
+import type { Candle } from '@shared/types'
 
 export interface ChartHandle {
   priceToY(price: number): number | null
@@ -16,30 +10,24 @@ export interface ChartHandle {
 
 interface Props {
   candles: Candle[]
-  trades?: Trade[]
   theme: 'dark' | 'light'
   onViewport(): void
+  fitKey: string // changes when symbol/interval changes -> refit; stays stable on live ticks
 }
 
-const darkColors = {
-  bg: '#14130F',
-  text: '#9a9485',
-  grid: 'rgba(58,53,42,0.4)',
-  up: '#5FB99A',
-  down: '#E06C5E'
-}
-const lightColors = {
-  bg: '#F4F1E9',
-  text: '#6c6555',
-  grid: 'rgba(216,209,191,0.6)',
-  up: '#2f8f6e',
-  down: '#c0493b'
+function palette(theme: 'dark' | 'light') {
+  return theme === 'dark'
+    ? { bg: '#14130F', text: '#9a9485', grid: 'rgba(58,53,42,0.4)', up: '#5FB99A', down: '#E06C5E' }
+    : { bg: '#F4F1E9', text: '#6c6555', grid: 'rgba(216,209,191,0.6)', up: '#2f8f6e', down: '#c0493b' }
 }
 
-const Chart = forwardRef<ChartHandle, Props>(({ candles, trades, theme, onViewport }, ref) => {
+const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, onViewport, fitKey }, ref) => {
   const hostRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const lastFitKey = useRef<string>('')
+  const themeRef = useRef(theme)
+  themeRef.current = theme
 
   useImperativeHandle(ref, () => ({
     priceToY: (price: number) => {
@@ -50,40 +38,36 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, trades, theme, onViewpo
       const c = chartRef.current?.timeScale().timeToCoordinate(time as UTCTimestamp)
       return c == null ? null : (c as number)
     },
-    size: () => ({
-      width: hostRef.current?.clientWidth ?? 0,
-      height: hostRef.current?.clientHeight ?? 0
-    })
+    size: () => ({ width: hostRef.current?.clientWidth ?? 0, height: hostRef.current?.clientHeight ?? 0 })
   }))
 
-  // create chart once
+  // Create the chart ONCE. Theme + data are applied by the effects below, so a
+  // theme toggle never tears down the series (which previously blanked the candles).
   useEffect(() => {
     if (!hostRef.current) return
-    const colors = theme === 'dark' ? darkColors : lightColors
+    const c = palette(themeRef.current)
     const chart = createChart(hostRef.current, {
       width: hostRef.current.clientWidth,
       height: hostRef.current.clientHeight,
-      layout: { background: { color: colors.bg }, textColor: colors.text, fontFamily: 'SF Mono, Menlo, monospace' },
-      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
-      rightPriceScale: { borderColor: colors.grid },
-      timeScale: { borderColor: colors.grid, timeVisible: true, rightOffset: 6 },
+      layout: { background: { color: c.bg }, textColor: c.text, fontFamily: 'SF Mono, Menlo, monospace' },
+      grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+      rightPriceScale: { borderColor: c.grid },
+      timeScale: { borderColor: c.grid, timeVisible: true, secondsVisible: false, rightOffset: 6 },
       crosshair: { mode: 0 }
     })
-    const seriesOpts: CandlestickSeriesPartialOptions = {
-      upColor: colors.up,
-      downColor: colors.down,
-      borderUpColor: colors.up,
-      borderDownColor: colors.down,
-      wickUpColor: colors.up,
-      wickDownColor: colors.down
-    }
-    const series = chart.addCandlestickSeries(seriesOpts)
+    const series = chart.addCandlestickSeries({
+      upColor: c.up,
+      downColor: c.down,
+      borderUpColor: c.up,
+      borderDownColor: c.down,
+      wickUpColor: c.up,
+      wickDownColor: c.down
+    })
     chartRef.current = chart
     seriesRef.current = series
 
     const fire = () => onViewport()
     chart.timeScale().subscribeVisibleTimeRangeChange(fire)
-
     const ro = new ResizeObserver(() => {
       if (!hostRef.current) return
       chart.applyOptions({ width: hostRef.current.clientWidth, height: hostRef.current.clientHeight })
@@ -98,12 +82,38 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, trades, theme, onViewpo
       seriesRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Apply theme colours live, without recreating the chart.
+  useEffect(() => {
+    const chart = chartRef.current
+    const series = seriesRef.current
+    if (!chart || !series) return
+    const c = palette(theme)
+    chart.applyOptions({
+      layout: { background: { color: c.bg }, textColor: c.text },
+      grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+      rightPriceScale: { borderColor: c.grid },
+      timeScale: { borderColor: c.grid }
+    })
+    series.applyOptions({
+      upColor: c.up,
+      downColor: c.down,
+      borderUpColor: c.up,
+      borderDownColor: c.down,
+      wickUpColor: c.up,
+      wickDownColor: c.down
+    })
+    onViewport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme])
 
-  // update data
+  // Push data on every change (including live ticks). Only refit the viewport when
+  // the symbol/interval changes, so live updates don't yank the user's zoom/pan.
   useEffect(() => {
-    if (!seriesRef.current) return
-    seriesRef.current.setData(
+    const series = seriesRef.current
+    if (!series) return
+    series.setData(
       candles.map((c) => ({
         time: c.time as UTCTimestamp,
         open: c.open,
@@ -112,32 +122,13 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, trades, theme, onViewpo
         close: c.close
       }))
     )
-    if (trades && trades.length) {
-      seriesRef.current.setMarkers(
-        trades.flatMap((t) => [
-          {
-            time: t.entryTime as UTCTimestamp,
-            position: t.direction === 'long' ? ('belowBar' as const) : ('aboveBar' as const),
-            color: t.direction === 'long' ? darkColors.up : darkColors.down,
-            shape: t.direction === 'long' ? ('arrowUp' as const) : ('arrowDown' as const),
-            text: 'in'
-          },
-          {
-            time: t.exitTime as UTCTimestamp,
-            position: 'aboveBar' as const,
-            color: t.returnPct >= 0 ? darkColors.up : darkColors.down,
-            shape: 'circle' as const,
-            text: t.returnPct >= 0 ? 'win' : 'loss'
-          }
-        ])
-      )
-    } else {
-      seriesRef.current.setMarkers([])
+    if (fitKey !== lastFitKey.current) {
+      chartRef.current?.timeScale().fitContent()
+      lastFitKey.current = fitKey
     }
-    chartRef.current?.timeScale().fitContent()
     onViewport()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, trades])
+  }, [candles, fitKey])
 
   return <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />
 })

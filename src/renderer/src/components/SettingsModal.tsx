@@ -12,6 +12,8 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
   const [alpacaKey, setAlpacaKey] = useState('')
   const [alpacaSecret, setAlpacaSecret] = useState('')
   const [twelveKey, setTwelveKey] = useState('')
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [testing, setTesting] = useState(false)
 
   useEffect(() => {
     window.desk.getSettings().then(setS)
@@ -19,7 +21,7 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
 
   if (!s) return null
 
-  const save = async () => {
+  const persist = async (): Promise<MaskedSettings> => {
     const patch: Partial<AppSettings> = {
       geminiModel: s.geminiModel,
       llmAugmentation: s.llmAugmentation
@@ -28,9 +30,30 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
     if (alpacaKey) patch.alpacaKey = alpacaKey
     if (alpacaSecret) patch.alpacaSecret = alpacaSecret
     if (twelveKey) patch.twelveDataKey = twelveKey
-    const masked = await window.desk.saveSettings(patch)
+    return window.desk.saveSettings(patch)
+  }
+
+  const save = async () => {
+    const masked = await persist()
     onSaved(masked)
     onClose()
+  }
+
+  const test = async () => {
+    setTesting(true)
+    setTestMsg(null)
+    try {
+      // Save the typed key first so the test exercises exactly what will be used.
+      const masked = await persist()
+      setS(masked)
+      setGeminiKey('')
+      const res = await window.desk.testGemini()
+      setTestMsg({ ok: res.ok, text: res.message })
+    } catch (e) {
+      setTestMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setTesting(false)
+    }
   }
 
   return (
@@ -93,11 +116,26 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
           </label>
         </div>
 
-        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-          <button onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={save}>
-            Save
+        {testMsg && (
+          <p
+            className="mono"
+            style={{ fontSize: 12, color: testMsg.ok ? 'var(--bull)' : 'var(--bear)', marginTop: 0 }}
+          >
+            {testMsg.ok ? '✓ ' : '✗ '}
+            {testMsg.text}
+          </p>
+        )}
+
+        <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+          <button onClick={test} disabled={testing}>
+            {testing ? 'Testing…' : 'Test Gemini key'}
           </button>
+          <div className="row">
+            <button onClick={onClose}>Cancel</button>
+            <button className="primary" onClick={save}>
+              Save
+            </button>
+          </div>
         </div>
         <p style={{ fontSize: 11, color: 'var(--bone-dim)', marginBottom: 0 }}>
           Keys are stored locally in the main process only and never reach the chart UI.

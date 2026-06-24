@@ -1,4 +1,4 @@
-import type { AssetClass, CandleSeries, Interval, SeriesMeta } from '@shared/types'
+import type { AssetClass, CandleSeries, Interval, Quote, SeriesMeta } from '@shared/types'
 import { BinanceProvider, MarketDataProvider, YahooProvider } from './providers'
 import { candleRange, readCandles, writeCandles } from '../db'
 
@@ -80,6 +80,11 @@ export async function getSeries(symbol: string, interval: Interval): Promise<Can
   const candles = readCandles(symbol, degraded && resolution !== interval ? resolution : interval)
   const meta: SeriesMeta = { symbol, interval, source: provider.id, resolution, degraded }
   return { meta, candles }
+}
+
+export async function getQuote(symbol: string): Promise<Quote> {
+  const provider = resolveProvider(symbol)
+  return provider.getLatest(symbol)
 }
 
 interface SearchHit {

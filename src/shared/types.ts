@@ -254,11 +254,13 @@ export interface SymbolAnalysis {
 export interface DeskBridge {
   searchSymbols(query: string): Promise<{ symbol: string; name: string; assetClass: AssetClass; source: string }[]>
   getCandles(symbol: string, interval: Interval): Promise<CandleSeries>
+  getQuote(symbol: string): Promise<Quote>
   analyze(symbol: string, interval: Interval): Promise<SymbolAnalysis>
   runResearch(symbol: string, interval: Interval): Promise<ResearchRun>
   getPromoted(): Promise<PromotedSetup[]>
   deskVerdict(ctx: DeskContext): Promise<DeskVerdict>
   deskChat(ctx: DeskContext, history: ChatMessage[], message: string): Promise<string>
+  testGemini(): Promise<{ ok: boolean; message: string }>
   getSettings(): Promise<MaskedSettings>
   saveSettings(patch: Partial<AppSettings>): Promise<MaskedSettings>
 }

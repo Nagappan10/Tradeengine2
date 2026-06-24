@@ -12,12 +12,14 @@ import type {
 const bridge: DeskBridge = {
   searchSymbols: (query) => ipcRenderer.invoke('searchSymbols', query),
   getCandles: (symbol, interval: Interval) => ipcRenderer.invoke('getCandles', symbol, interval),
+  getQuote: (symbol) => ipcRenderer.invoke('getQuote', symbol),
   analyze: (symbol, interval: Interval) => ipcRenderer.invoke('analyze', symbol, interval),
   runResearch: (symbol, interval: Interval) => ipcRenderer.invoke('runResearch', symbol, interval),
   getPromoted: () => ipcRenderer.invoke('getPromoted'),
   deskVerdict: (ctx: DeskContext) => ipcRenderer.invoke('deskVerdict', ctx),
   deskChat: (ctx: DeskContext, history: ChatMessage[], message: string) =>
     ipcRenderer.invoke('deskChat', ctx, history, message),
+  testGemini: () => ipcRenderer.invoke('testGemini'),
   getSettings: () => ipcRenderer.invoke('getSettings'),
   saveSettings: (patch: Partial<AppSettings>) => ipcRenderer.invoke('saveSettings', patch)
 }
