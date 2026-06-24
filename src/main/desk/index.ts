@@ -2,16 +2,18 @@ import type { ChatMessage, DeskContext, DeskVerdict } from '@shared/types'
 import { readSettings } from '../settings'
 import * as gemini from './gemini'
 import * as groq from './groq'
+import * as openrouter from './openrouter'
 
-// Route Desk calls to the configured provider (Gemini or Groq). Falls back to
-// whichever provider actually has a key if the configured one is unset.
+// Route Desk calls to the configured provider. Falls back to whichever provider
+// actually has a key if the configured one is unset.
 function provider() {
   const s = readSettings()
-  const choice = s.deskProvider
-  if (choice === 'groq' && s.groqApiKey) return groq
-  if (choice === 'gemini' && s.geminiApiKey) return gemini
-  if (s.groqApiKey) return groq
-  if (s.geminiApiKey) return gemini
+  const has = { gemini: !!s.geminiApiKey, groq: !!s.groqApiKey, openrouter: !!s.openrouterApiKey }
+  if (s.deskProvider === 'groq' && has.groq) return groq
+  if (s.deskProvider === 'openrouter' && has.openrouter) return openrouter
+  if (s.deskProvider === 'gemini' && has.gemini) return gemini
+  if (has.openrouter) return openrouter
+  if (has.groq) return groq
   return gemini // returns its own "no key" fallback verdict
 }
 
@@ -24,7 +26,8 @@ export function deskChat(ctx: DeskContext, history: ChatMessage[], message: stri
 }
 
 export function testDesk(): Promise<{ ok: boolean; message: string }> {
-  const s = readSettings()
-  const useGroq = s.deskProvider === 'groq' || (s.deskProvider !== 'gemini' && !!s.groqApiKey && !s.geminiApiKey)
-  return useGroq ? groq.testGroq() : gemini.testGemini()
+  const p = provider()
+  if (p === groq) return groq.testGroq()
+  if (p === openrouter) return openrouter.testOpenRouter()
+  return gemini.testGemini()
 }

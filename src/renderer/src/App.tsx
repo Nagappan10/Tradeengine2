@@ -62,10 +62,45 @@ export default function App() {
     load(symbol, interval)
   }, [symbol, interval, load])
 
-  // Live quote polling — ticks the most recent (forming) bar so the chart moves
-  // in real time without re-fetching the whole series or re-running the engine.
+  const [streaming, setStreaming] = useState(false)
+
+  // Merge a live bar into the series: replace the forming bar, or append a new one.
+  const applyLiveBar = useCallback((c: Candle) => {
+    setCandles((prev) => {
+      if (!prev.length) return prev
+      const next = prev.slice()
+      const last = next[next.length - 1]
+      if (c.time === last.time) next[next.length - 1] = c
+      else if (c.time > last.time) next.push(c)
+      else return prev
+      return next
+    })
+  }, [])
+
+  // Real-time Binance WebSocket for crypto — true tick-by-tick updates.
   useEffect(() => {
-    if (error) return
+    let unsub: (() => void) | null = null
+    let cancelled = false
+    setStreaming(false)
+    window.desk.subscribeStream(symbol, interval).then((active) => {
+      if (cancelled) return
+      setStreaming(active)
+      setLive(active)
+    })
+    unsub = window.desk.onStreamCandle((candle) => {
+      applyLiveBar(candle)
+      setLive(true)
+    })
+    return () => {
+      cancelled = true
+      if (unsub) unsub()
+      window.desk.unsubscribeStream()
+    }
+  }, [symbol, interval, applyLiveBar])
+
+  // Fallback quote polling for non-crypto (no WebSocket) — ticks the forming bar.
+  useEffect(() => {
+    if (error || streaming) return
     let stop = false
     const tick = async () => {
       try {
@@ -91,7 +126,7 @@ export default function App() {
       stop = true
       window.clearInterval(id)
     }
-  }, [symbol, interval, error])
+  }, [symbol, interval, error, streaming])
 
   // Periodic soft refresh of firing setups / ML (no loading shimmer).
   useEffect(() => {
@@ -170,6 +205,7 @@ export default function App() {
             <div className="chart-badge mono">
               <span className={`live-dot ${live ? 'on' : ''}`} />
               {symbol} · {analysis.meta.source} · {analysis.meta.resolution}
+              {streaming ? ' · live stream' : ' · delayed'}
               {analysis.meta.degraded ? ' · degraded→daily' : ''}
               {lastPrice != null ? ` · ${lastPrice}` : ''} · {candles.length} bars
             </div>

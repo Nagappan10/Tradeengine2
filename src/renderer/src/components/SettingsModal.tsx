@@ -10,6 +10,7 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
   const [s, setS] = useState<MaskedSettings | null>(null)
   const [geminiKey, setGeminiKey] = useState('')
   const [groqKey, setGroqKey] = useState('')
+  const [orKey, setOrKey] = useState('')
   const [alpacaKey, setAlpacaKey] = useState('')
   const [alpacaSecret, setAlpacaSecret] = useState('')
   const [twelveKey, setTwelveKey] = useState('')
@@ -26,11 +27,13 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
     const patch: Partial<AppSettings> = {
       geminiModel: s.geminiModel,
       groqModel: s.groqModel,
+      openrouterModel: s.openrouterModel,
       deskProvider: s.deskProvider,
       llmAugmentation: s.llmAugmentation
     }
     if (geminiKey) patch.geminiApiKey = geminiKey
     if (groqKey) patch.groqApiKey = groqKey
+    if (orKey) patch.openrouterApiKey = orKey
     if (alpacaKey) patch.alpacaKey = alpacaKey
     if (alpacaSecret) patch.alpacaSecret = alpacaSecret
     if (twelveKey) patch.twelveDataKey = twelveKey
@@ -52,6 +55,7 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
       setS(masked)
       setGeminiKey('')
       setGroqKey('')
+      setOrKey('')
       const res = await window.desk.testDesk()
       setTestMsg({ ok: res.ok, text: res.message })
     } catch (e) {
@@ -74,6 +78,7 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
           >
             <option value="gemini">Gemini (Google · web-search grounding)</option>
             <option value="groq">Groq (free · fast · no web search)</option>
+            <option value="openrouter">OpenRouter (free models · no web search)</option>
           </select>
         </div>
 
@@ -112,6 +117,26 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
             <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
             <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
             <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label>OpenRouter API key {s.hasOpenrouterKey ? '· (set)' : '· (not set)'}</label>
+          <input
+            type="password"
+            placeholder={s.hasOpenrouterKey ? '•••••••• (leave blank to keep)' : 'paste OpenRouter key (sk-or-…)'}
+            value={orKey}
+            onChange={(e) => setOrKey(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>OpenRouter model</label>
+          <select value={s.openrouterModel} onChange={(e) => setS({ ...s, openrouterModel: e.target.value })}>
+            <option value="meta-llama/llama-3.3-70b-instruct:free">llama-3.3-70b-instruct:free</option>
+            <option value="deepseek/deepseek-chat-v3-0324:free">deepseek-chat-v3:free</option>
+            <option value="google/gemini-2.0-flash-exp:free">gemini-2.0-flash-exp:free</option>
+            <option value="qwen/qwen-2.5-72b-instruct:free">qwen-2.5-72b:free</option>
           </select>
         </div>
 

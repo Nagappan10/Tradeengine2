@@ -1,6 +1,7 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import type {
   AppSettings,
+  Candle,
   ChatMessage,
   DeskBridge,
   DeskContext,
@@ -13,6 +14,13 @@ const bridge: DeskBridge = {
   searchSymbols: (query) => ipcRenderer.invoke('searchSymbols', query),
   getCandles: (symbol, interval: Interval) => ipcRenderer.invoke('getCandles', symbol, interval),
   getQuote: (symbol) => ipcRenderer.invoke('getQuote', symbol),
+  subscribeStream: (symbol, interval: Interval) => ipcRenderer.invoke('subscribeStream', symbol, interval),
+  unsubscribeStream: () => ipcRenderer.invoke('unsubscribeStream'),
+  onStreamCandle: (cb: (candle: Candle, closed: boolean) => void) => {
+    const handler = (_e: IpcRendererEvent, candle: Candle, closed: boolean) => cb(candle, closed)
+    ipcRenderer.on('stream:candle', handler)
+    return () => ipcRenderer.removeListener('stream:candle', handler)
+  },
   analyze: (symbol, interval: Interval) => ipcRenderer.invoke('analyze', symbol, interval),
   runResearch: (symbol, interval: Interval) => ipcRenderer.invoke('runResearch', symbol, interval),
   getPromoted: () => ipcRenderer.invoke('getPromoted'),

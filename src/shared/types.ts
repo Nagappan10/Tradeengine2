@@ -225,7 +225,9 @@ export interface AppSettings {
   geminiModel: string
   groqApiKey: string
   groqModel: string
-  deskProvider: 'gemini' | 'groq'
+  openrouterApiKey: string
+  openrouterModel: string
+  deskProvider: 'gemini' | 'groq' | 'openrouter'
   alpacaKey: string
   alpacaSecret: string
   twelveDataKey: string
@@ -233,9 +235,13 @@ export interface AppSettings {
   theme: 'dark' | 'light'
 }
 
-export type MaskedSettings = Omit<AppSettings, 'geminiApiKey' | 'groqApiKey' | 'alpacaSecret' | 'twelveDataKey'> & {
+export type MaskedSettings = Omit<
+  AppSettings,
+  'geminiApiKey' | 'groqApiKey' | 'openrouterApiKey' | 'alpacaSecret' | 'twelveDataKey'
+> & {
   hasGeminiKey: boolean
   hasGroqKey: boolean
+  hasOpenrouterKey: boolean
   hasAlpacaKey: boolean
   hasTwelveDataKey: boolean
 }
@@ -260,6 +266,9 @@ export interface DeskBridge {
   searchSymbols(query: string): Promise<{ symbol: string; name: string; assetClass: AssetClass; source: string }[]>
   getCandles(symbol: string, interval: Interval): Promise<CandleSeries>
   getQuote(symbol: string): Promise<Quote>
+  subscribeStream(symbol: string, interval: Interval): Promise<boolean>
+  unsubscribeStream(): Promise<void>
+  onStreamCandle(cb: (candle: Candle, closed: boolean) => void): () => void
   analyze(symbol: string, interval: Interval): Promise<SymbolAnalysis>
   runResearch(symbol: string, interval: Interval): Promise<ResearchRun>
   getPromoted(): Promise<PromotedSetup[]>
