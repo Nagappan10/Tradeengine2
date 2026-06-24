@@ -13,6 +13,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "rebuild": "electron-builder install-app-deps",
+    "smoke": "electron-vite build && STRATEGY_DESK_SMOKE=BTCUSDT electron ./out/main/index.js",
     "package": "electron-vite build && electron-builder install-app-deps && electron-builder"
   },
   "dependencies": {
