@@ -4,6 +4,9 @@ import { getSetting, setSetting } from './db'
 const DEFAULTS: AppSettings = {
   geminiApiKey: '',
   geminiModel: 'gemini-2.5-flash',
+  groqApiKey: '',
+  groqModel: 'llama-3.3-70b-versatile',
+  deskProvider: 'gemini',
   alpacaKey: '',
   alpacaSecret: '',
   twelveDataKey: '',
@@ -15,6 +18,9 @@ export function readSettings(): AppSettings {
   return {
     geminiApiKey: getSetting('geminiApiKey') ?? DEFAULTS.geminiApiKey,
     geminiModel: getSetting('geminiModel') ?? DEFAULTS.geminiModel,
+    groqApiKey: getSetting('groqApiKey') ?? DEFAULTS.groqApiKey,
+    groqModel: getSetting('groqModel') ?? DEFAULTS.groqModel,
+    deskProvider: (getSetting('deskProvider') as 'gemini' | 'groq') ?? DEFAULTS.deskProvider,
     alpacaKey: getSetting('alpacaKey') ?? DEFAULTS.alpacaKey,
     alpacaSecret: getSetting('alpacaSecret') ?? DEFAULTS.alpacaSecret,
     twelveDataKey: getSetting('twelveDataKey') ?? DEFAULTS.twelveDataKey,
@@ -27,10 +33,13 @@ export function readSettings(): AppSettings {
 export function mask(s: AppSettings): MaskedSettings {
   return {
     geminiModel: s.geminiModel,
+    groqModel: s.groqModel,
+    deskProvider: s.deskProvider,
     alpacaKey: s.alpacaKey,
     llmAugmentation: s.llmAugmentation,
     theme: s.theme,
     hasGeminiKey: s.geminiApiKey.length > 0,
+    hasGroqKey: s.groqApiKey.length > 0,
     hasAlpacaKey: s.alpacaKey.length > 0 && s.alpacaSecret.length > 0,
     hasTwelveDataKey: s.twelveDataKey.length > 0
   }

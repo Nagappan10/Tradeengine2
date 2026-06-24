@@ -95,7 +95,9 @@ A Windows `.exe` installer is built on a real Windows runner by the
    candidates were tested, how many failed in-sample / out-of-sample / had no
    entry trigger, and how many were **flagged overfit and withheld**. When zero
    setups fire, the panel shows these diagnostics so the empty state is explained.
-6. **Desk** — Gemini Flash with Search grounding. First message is the structured
+6. **Desk** — pick the provider in Settings: **Gemini** Flash (with Google Search
+   grounding) or **Groq** (free, very fast, OpenAI-compatible, no web search).
+   First message is the structured
    YES/NO/WAIT verdict (separating historical edge from current read); after that
    it's a chat — ask "why short here?", "what invalidates this?" — with the full
    context (symbol, firing setups + OOS stats, S/R levels, timeframe, ML note)

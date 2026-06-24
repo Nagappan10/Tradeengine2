@@ -223,6 +223,9 @@ export interface DeskContext {
 export interface AppSettings {
   geminiApiKey: string // masked when returned to renderer
   geminiModel: string
+  groqApiKey: string
+  groqModel: string
+  deskProvider: 'gemini' | 'groq'
   alpacaKey: string
   alpacaSecret: string
   twelveDataKey: string
@@ -230,8 +233,9 @@ export interface AppSettings {
   theme: 'dark' | 'light'
 }
 
-export type MaskedSettings = Omit<AppSettings, 'geminiApiKey' | 'alpacaSecret' | 'twelveDataKey'> & {
+export type MaskedSettings = Omit<AppSettings, 'geminiApiKey' | 'groqApiKey' | 'alpacaSecret' | 'twelveDataKey'> & {
   hasGeminiKey: boolean
+  hasGroqKey: boolean
   hasAlpacaKey: boolean
   hasTwelveDataKey: boolean
 }
@@ -261,7 +265,7 @@ export interface DeskBridge {
   getPromoted(): Promise<PromotedSetup[]>
   deskVerdict(ctx: DeskContext): Promise<DeskVerdict>
   deskChat(ctx: DeskContext, history: ChatMessage[], message: string): Promise<string>
-  testGemini(): Promise<{ ok: boolean; message: string }>
+  testDesk(): Promise<{ ok: boolean; message: string }>
   getSettings(): Promise<MaskedSettings>
   saveSettings(patch: Partial<AppSettings>): Promise<MaskedSettings>
 }

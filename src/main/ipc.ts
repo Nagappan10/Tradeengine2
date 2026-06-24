@@ -3,7 +3,7 @@ import type { AppSettings, ChatMessage, DeskContext, Interval } from '@shared/ty
 import { getQuote, getSeries, searchSymbols } from './data/registry'
 import { analyzeSymbol, research } from './engine/analyze'
 import { loadAllPromoted } from './db'
-import { deskChat, deskVerdict, testGemini } from './desk/gemini'
+import { deskChat, deskVerdict, testDesk } from './desk'
 import { mask, readSettings, writeSettings } from './settings'
 
 // All network/DB/secret access lives here in the main process. The renderer only
@@ -27,7 +27,7 @@ export function registerIpc(): void {
     deskChat(ctx, history, message)
   )
 
-  ipcMain.handle('testGemini', () => testGemini())
+  ipcMain.handle('testDesk', () => testDesk())
 
   ipcMain.handle('getSettings', () => mask(readSettings()))
 

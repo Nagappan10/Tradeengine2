@@ -9,6 +9,7 @@ interface Props {
 export default function SettingsModal({ onClose, onSaved }: Props) {
   const [s, setS] = useState<MaskedSettings | null>(null)
   const [geminiKey, setGeminiKey] = useState('')
+  const [groqKey, setGroqKey] = useState('')
   const [alpacaKey, setAlpacaKey] = useState('')
   const [alpacaSecret, setAlpacaSecret] = useState('')
   const [twelveKey, setTwelveKey] = useState('')
@@ -24,9 +25,12 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
   const persist = async (): Promise<MaskedSettings> => {
     const patch: Partial<AppSettings> = {
       geminiModel: s.geminiModel,
+      groqModel: s.groqModel,
+      deskProvider: s.deskProvider,
       llmAugmentation: s.llmAugmentation
     }
     if (geminiKey) patch.geminiApiKey = geminiKey
+    if (groqKey) patch.groqApiKey = groqKey
     if (alpacaKey) patch.alpacaKey = alpacaKey
     if (alpacaSecret) patch.alpacaSecret = alpacaSecret
     if (twelveKey) patch.twelveDataKey = twelveKey
@@ -47,7 +51,8 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
       const masked = await persist()
       setS(masked)
       setGeminiKey('')
-      const res = await window.desk.testGemini()
+      setGroqKey('')
+      const res = await window.desk.testDesk()
       setTestMsg({ ok: res.ok, text: res.message })
     } catch (e) {
       setTestMsg({ ok: false, text: (e as Error).message })
@@ -60,6 +65,17 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="glass modal" onMouseDown={(e) => e.stopPropagation()}>
         <h3 className="section-title">Settings</h3>
+
+        <div className="field">
+          <label>Desk AI provider</label>
+          <select
+            value={s.deskProvider}
+            onChange={(e) => setS({ ...s, deskProvider: e.target.value as 'gemini' | 'groq' })}
+          >
+            <option value="gemini">Gemini (Google · web-search grounding)</option>
+            <option value="groq">Groq (free · fast · no web search)</option>
+          </select>
+        </div>
 
         <div className="field">
           <label>Gemini API key {s.hasGeminiKey ? '· (set)' : '· (not set)'}</label>
@@ -77,6 +93,25 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
             <option value="gemini-2.5-flash">gemini-2.5-flash</option>
             <option value="gemini-2.0-flash">gemini-2.0-flash</option>
             <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label>Groq API key {s.hasGroqKey ? '· (set)' : '· (not set)'}</label>
+          <input
+            type="password"
+            placeholder={s.hasGroqKey ? '•••••••• (leave blank to keep)' : 'paste Groq API key (gsk_…)'}
+            value={groqKey}
+            onChange={(e) => setGroqKey(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>Groq model</label>
+          <select value={s.groqModel} onChange={(e) => setS({ ...s, groqModel: e.target.value })}>
+            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+            <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+            <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
           </select>
         </div>
 
@@ -128,7 +163,7 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
 
         <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
           <button onClick={test} disabled={testing}>
-            {testing ? 'Testing…' : 'Test Gemini key'}
+            {testing ? 'Testing…' : 'Test Desk AI'}
           </button>
           <div className="row">
             <button onClick={onClose}>Cancel</button>

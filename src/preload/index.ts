@@ -19,7 +19,7 @@ const bridge: DeskBridge = {
   deskVerdict: (ctx: DeskContext) => ipcRenderer.invoke('deskVerdict', ctx),
   deskChat: (ctx: DeskContext, history: ChatMessage[], message: string) =>
     ipcRenderer.invoke('deskChat', ctx, history, message),
-  testGemini: () => ipcRenderer.invoke('testGemini'),
+  testDesk: () => ipcRenderer.invoke('testDesk'),
   getSettings: () => ipcRenderer.invoke('getSettings'),
   saveSettings: (patch: Partial<AppSettings>) => ipcRenderer.invoke('saveSettings', patch)
 }
