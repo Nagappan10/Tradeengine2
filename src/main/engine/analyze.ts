@@ -2,6 +2,7 @@ import type { Interval, SymbolAnalysis, ResearchRun } from '@shared/types'
 import { getSeries } from '../data/registry'
 import { detectSwings } from './swings'
 import { detectZones } from './zones'
+import { detectTrendlines } from './trendlines'
 import { mlSignal } from './ml'
 import { trackDecay } from './decay'
 import { currentFromPromoted, runResearch } from './research'
@@ -14,6 +15,7 @@ export async function analyzeSymbol(symbol: string, interval: Interval): Promise
   const candles = series.candles
   const swings = detectSwings(candles, 3, 3)
   const zones = detectZones(candles, swings)
+  const trendlines = detectTrendlines(candles, swings)
 
   let promoted = loadPromoted(symbol, interval)
   let diagnostics
@@ -45,6 +47,7 @@ export async function analyzeSymbol(symbol: string, interval: Interval): Promise
     candles,
     zones,
     swings,
+    trendlines,
     firingSetups,
     promotedSetups,
     diagnostics,

@@ -388,6 +388,106 @@ button.tiny {
   pointer-events: none;
   z-index: 5;
 }
+
+/* transparent layer that captures clicks while a drawing tool is active */
+.draw-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  cursor: crosshair;
+}
+
+/* vertical drawing toolbar on the left edge of the chart */
+.draw-toolbar {
+  position: absolute;
+  top: 56px;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.draw-toolbar button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 15px;
+  border: none;
+  background: transparent;
+  color: var(--bone-dim);
+  box-shadow: none;
+  transform: none;
+}
+.draw-toolbar button:hover {
+  background: var(--panel-2);
+  color: var(--bone);
+  box-shadow: none;
+}
+.draw-toolbar button.active {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* P/L stats widget (TradingView-style), bottom-left, closable */
+.stats-widget {
+  position: absolute;
+  bottom: 16px;
+  left: 56px;
+  z-index: 6;
+  width: 180px;
+  padding: 12px;
+}
+.stats-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.stats-head .x {
+  border: none;
+  background: transparent;
+  padding: 0 4px;
+  color: var(--bone-dim);
+  box-shadow: none;
+}
+.stats-price {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.stats-toggle {
+  position: absolute;
+  bottom: 16px;
+  left: 56px;
+  z-index: 6;
+  font-size: 12px;
+}
+.up {
+  color: var(--bull);
+}
+.down {
+  color: var(--bear);
+}
+
+.best-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #14130f;
+  background: var(--amber);
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
 .overlay .interactive {
   pointer-events: auto;
 }

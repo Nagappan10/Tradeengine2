@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Candle, DeskContext, Interval, MaskedSettings, SymbolAnalysis } from '@shared/types'
 import Chart, { ChartHandle, Overlays } from './components/Chart'
-import SetupOverlay from './components/SetupOverlay'
+import SetupOverlay, { Drawing } from './components/SetupOverlay'
 import SetupPanel from './components/SetupPanel'
 import SignalsCard from './components/SignalsCard'
 import IndicatorBar from './components/IndicatorBar'
+import DrawToolbar, { DrawTool } from './components/DrawToolbar'
+import StatsWidget from './components/StatsWidget'
 import DeskChat from './components/DeskChat'
 import TopBar from './components/TopBar'
 import SettingsModal from './components/SettingsModal'
 
 const BANNER = 'Hypothesis, not a guarantee. Paper-trade before risking capital. Not financial advice.'
-const LIVE_POLL_MS = 5000 // tick the live price
+const LIVE_POLL_MS = 3000 // tick the live price (non-crypto fallback)
 const SOFT_REFRESH_MS = 60000 // refresh firing setups / ML
 
 export default function App() {
@@ -63,6 +65,37 @@ export default function App() {
   }, [symbol, interval, load])
 
   const [streaming, setStreaming] = useState(false)
+  const [tool, setTool] = useState<DrawTool>('none')
+  const [drawings, setDrawings] = useState<Drawing[]>([])
+  const [pending, setPending] = useState<{ t: number; p: number } | null>(null)
+
+  // Reset manual drawings when the symbol/timeframe changes.
+  useEffect(() => {
+    setDrawings([])
+    setPending(null)
+    setTool('none')
+  }, [symbol, interval])
+
+  const onChartClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      const api = chartRef.current
+      if (!api || tool === 'none') return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const t = api.xToTime(e.clientX - rect.left)
+      const p = api.yToPrice(e.clientY - rect.top)
+      if (t == null || p == null) return
+      if (tool === 'hline') {
+        setDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'hline', t1: t, p1: p, t2: t + 1, p2: p }])
+      } else if (tool === 'trend') {
+        if (!pending) setPending({ t, p })
+        else {
+          setDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'trend', t1: pending.t, p1: pending.p, t2: t, p2: p }])
+          setPending(null)
+        }
+      }
+    },
+    [tool, pending]
+  )
 
   // Merge a live bar into the series: replace the forming bar, or append a new one.
   const applyLiveBar = useCallback((c: Candle) => {
@@ -231,6 +264,8 @@ export default function App() {
             </div>
           )}
           <IndicatorBar overlays={overlays} onToggle={toggleOverlay} />
+          <DrawToolbar tool={tool} onTool={setTool} onClear={() => setDrawings([])} hasDrawings={drawings.length > 0} />
+          {analysis && <StatsWidget symbol={symbol} candles={candles} />}
           <Chart
             ref={chartRef}
             candles={candles}
@@ -239,7 +274,21 @@ export default function App() {
             onViewport={onViewport}
             fitKey={fitKey}
           />
-          <SetupOverlay chartRef={chartRef} version={version} setup={selectedSetup} zones={analysis?.zones ?? []} />
+          <SetupOverlay
+            chartRef={chartRef}
+            version={version}
+            setup={selectedSetup}
+            zones={analysis?.zones ?? []}
+            trendlines={analysis?.trendlines ?? []}
+            drawings={drawings}
+          />
+          {tool !== 'none' && (
+            <div
+              className="draw-layer"
+              onClick={onChartClick}
+              title={pending ? 'click the second point' : 'click to draw'}
+            />
+          )}
         </div>
 
         <div className="side">

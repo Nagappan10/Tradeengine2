@@ -68,7 +68,7 @@ export default function SetupPanel({
           </p>
         </div>
       ) : (
-        setups.map(({ setup, stats }) => {
+        setups.map(({ setup, stats }, rank) => {
           const open = !!openStats[setup.id]
           return (
             <div
@@ -78,10 +78,15 @@ export default function SetupPanel({
             >
               <div className="setup-head">
                 <strong>
+                  {rank === 0 && <span className="best-badge">★ BEST</span>}
                   {setup.firing && <span style={{ color: 'var(--bull)' }}>● </span>}
                   {setup.name}
                 </strong>
                 <span className={`dir ${setup.direction}`}>{setup.direction.toUpperCase()}</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--bone-dim)' }}>
+                #{rank + 1} · OOS {(stats.winRate * 100).toFixed(0)}% over {stats.sampleSize} · PF {stats.profitFactor}
+                {setup.firing ? ' · firing now' : ''}
               </div>
               <div style={{ fontSize: 11, color: 'var(--bone-dim)', margin: '2px 0 6px' }}>{setup.reasoning}</div>
               <StatRow k="entry" v={String(setup.entryPrice)} />

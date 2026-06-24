@@ -52,6 +52,16 @@ export interface Zone {
   strength: number // 0..1 score
 }
 
+// A diagonal trendline fitted through swing lows (support) or highs (resistance).
+export interface Trendline {
+  kind: 'support' | 'resistance'
+  t1: number
+  p1: number
+  t2: number
+  p2: number
+  touches: number
+}
+
 // ---------- Setups: concrete, testable trade objects ----------
 
 export type EntryTrigger =
@@ -253,6 +263,7 @@ export interface SymbolAnalysis {
   candles: Candle[]
   zones: Zone[]
   swings: Swing[]
+  trendlines: Trendline[]
   firingSetups: { setup: Setup; stats: SetupStats }[]
   promotedSetups: { setup: Setup; stats: SetupStats }[]
   diagnostics: ResearchDiagnostics

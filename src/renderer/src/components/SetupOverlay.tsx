@@ -1,18 +1,29 @@
 import { RefObject, useMemo } from 'react'
-import type { Setup, Zone } from '@shared/types'
+import type { Setup, Trendline, Zone } from '@shared/types'
 import type { ChartHandle } from './Chart'
+
+export interface Drawing {
+  id: string
+  kind: 'trend' | 'hline'
+  t1: number
+  p1: number
+  t2: number
+  p2: number
+}
 
 interface Props {
   chartRef: RefObject<ChartHandle>
   version: number // bumped whenever the chart viewport/size changes -> forces re-map
   setup: Setup | null
   zones: Zone[]
+  trendlines: Trendline[]
+  drawings: Drawing[]
 }
 
 // Draws the full strategy markup directly on the candles:
 // green support box, red resistance box, dashed entry line, green target box,
 // red stop box and a small label. Re-maps prices->pixels on every viewport change.
-export default function SetupOverlay({ chartRef, version, setup, zones }: Props) {
+export default function SetupOverlay({ chartRef, version, setup, zones, trendlines, drawings }: Props) {
   const geom = useMemo(() => {
     const api = chartRef.current
     if (!api) return null
@@ -29,7 +40,24 @@ export default function SetupOverlay({ chartRef, version, setup, zones }: Props)
       yHigh: clamp(api.priceToY(z.high))
     }))
 
-    if (!setup) return { width, height, zoneRects, setupGeom: null }
+    // Map a (t1,p1)-(t2,p2) segment to pixels, extended to the right edge.
+    const seg = (t1: number, p1: number, t2: number, p2: number) => {
+      const x1 = api.timeToX(t1)
+      const y1 = api.priceToY(p1)
+      const x2 = api.timeToX(t2)
+      const y2 = api.priceToY(p2)
+      if (x1 == null || y1 == null || x2 == null || y2 == null) return null
+      if (x2 === x1) return { x1, y1, x2, y2 }
+      const yRight = y1 + ((y2 - y1) * (width - x1)) / (x2 - x1)
+      return { x1, y1, x2: width, y2: yRight }
+    }
+
+    const tlSegs = trendlines
+      .map((t) => ({ kind: t.kind, touches: t.touches, s: seg(t.t1, t.p1, t.t2, t.p2) }))
+      .filter((t) => t.s)
+    const drawSegs = drawings.map((d) => ({ id: d.id, kind: d.kind, s: seg(d.t1, d.p1, d.t2, d.p2) })).filter((d) => d.s)
+
+    if (!setup) return { width, height, zoneRects, setupGeom: null, tlSegs, drawSegs }
 
     const projX = Math.round(width * 0.52)
     const projW = Math.max(20, width - projX - 64)
@@ -44,9 +72,9 @@ export default function SetupOverlay({ chartRef, version, setup, zones }: Props)
       projX,
       projW
     }
-    return { width, height, zoneRects, setupGeom }
+    return { width, height, zoneRects, setupGeom, tlSegs, drawSegs }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, setup, zones, chartRef])
+  }, [version, setup, zones, trendlines, drawings, chartRef])
 
   if (!geom) return null
 
@@ -74,6 +102,33 @@ export default function SetupOverlay({ chartRef, version, setup, zones }: Props)
   return (
     <svg className="overlay" width={geom.width} height={geom.height} style={{ pointerEvents: 'none' }}>
       <style>{`.setup-rect{transition:opacity .3s ease} .setup-line{transition:opacity .3s ease}`}</style>
+
+      {/* Auto-detected diagonal trendlines (labelled with touch count). */}
+      {geom.tlSegs.map((t, i) =>
+        t.s ? (
+          <g key={`tl${i}`}>
+            <line
+              x1={t.s.x1}
+              y1={t.s.y1}
+              x2={t.s.x2}
+              y2={t.s.y2}
+              stroke={t.kind === 'support' ? bull : bear}
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+            />
+            <text x={t.s.x1 + 4} y={t.s.y1 - 4} fill={t.kind === 'support' ? bull : bear} fontSize={10} fontFamily="monospace">
+              {t.kind} trend · {t.touches} touches
+            </text>
+          </g>
+        ) : null
+      )}
+
+      {/* User-drawn lines */}
+      {geom.drawSegs.map((d) =>
+        d.s ? (
+          <line key={d.id} x1={d.s.x1} y1={d.s.y1} x2={d.s.x2} y2={d.s.y2} stroke="var(--amber)" strokeWidth={1.6} strokeOpacity={0.9} />
+        ) : null
+      )}
 
       {/* Detected S/R zones — always drawn so resistance/support is visible. */}
       {geom.zoneRects.map((z, i) => (

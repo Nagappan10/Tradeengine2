@@ -6,6 +6,8 @@ import { bollinger, ema } from '@shared/indicators'
 export interface ChartHandle {
   priceToY(price: number): number | null
   timeToX(time: number): number | null
+  yToPrice(y: number): number | null
+  xToTime(x: number): number | null
   size(): { width: number; height: number }
 }
 
@@ -50,6 +52,14 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
     timeToX: (time: number) => {
       const c = chartRef.current?.timeScale().timeToCoordinate(time as UTCTimestamp)
       return c == null ? null : (c as number)
+    },
+    yToPrice: (y: number) => {
+      const p = seriesRef.current?.coordinateToPrice(y)
+      return p == null ? null : (p as number)
+    },
+    xToTime: (x: number) => {
+      const t = chartRef.current?.timeScale().coordinateToTime(x)
+      return t == null ? null : (t as number)
     },
     size: () => ({ width: hostRef.current?.clientWidth ?? 0, height: hostRef.current?.clientHeight ?? 0 })
   }))
