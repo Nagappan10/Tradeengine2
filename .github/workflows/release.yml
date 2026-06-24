@@ -6,6 +6,8 @@ name: Build Windows installer
 on:
   workflow_dispatch:
   push:
+    branches:
+      - 'claude/zealous-ptolemy-vnu20o'
     tags:
       - 'v*'
 
