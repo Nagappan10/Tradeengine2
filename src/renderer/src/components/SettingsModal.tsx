@@ -95,7 +95,7 @@ export default function SettingsModal({ onClose, onSaved }: Props) {
 
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
           <button onClick={onClose}>Cancel</button>
-          <button onClick={save} style={{ borderColor: 'var(--amber)', color: 'var(--amber)' }}>
+          <button className="primary" onClick={save}>
             Save
           </button>
         </div>

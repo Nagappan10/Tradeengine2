@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Rebuild native modules for Electron
+        run: npm run rebuild
+
+      - name: Install headless runtime deps for Electron
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libgbm1 libasound2t64 libgtk-3-0 libdrm2 || \
+          sudo apt-get install -y xvfb libnss3 libgbm1 libasound2 libgtk-3-0 libdrm2
+
+      - name: Headless engine smoke test (synthetic, no network)
+        run: |
+          xvfb-run -a env STRATEGY_DESK_SMOKE=SYNTH ./node_modules/.bin/electron ./out/main/index.js --no-sandbox | tee smoke.log
+          grep -q "SMOKE OK" smoke.log

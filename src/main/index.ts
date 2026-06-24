@@ -3,7 +3,7 @@ import { join } from 'path'
 import { initDb } from './db'
 import { registerIpc } from './ipc'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -33,6 +33,7 @@ function createWindow(): void {
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  return win
 }
 
 app.whenReady().then(async () => {
@@ -95,7 +96,19 @@ app.whenReady().then(async () => {
     return
   }
 
-  createWindow()
+  const win = createWindow()
+
+  // Screenshot mode: render the shell, capture a PNG and exit (for UI previews).
+  if (process.env['STRATEGY_DESK_SHOT']) {
+    const { writeFile } = await import('fs/promises')
+    win.webContents.on('did-finish-load', () => {
+      setTimeout(async () => {
+        const img = await win.webContents.capturePage()
+        await writeFile(process.env['STRATEGY_DESK_SHOT'] as string, img.toPNG())
+        app.exit(0)
+      }, 2500)
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

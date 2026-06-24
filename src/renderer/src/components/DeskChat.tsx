@@ -89,7 +89,7 @@ export default function DeskChat({ ctx }: Props) {
       <h3 className="section-title">Desk — ask anything</h3>
 
       {!verdict ? (
-        <button style={{ width: '100%' }} onClick={getCall} disabled={!ctx || busy}>
+        <button className="primary" style={{ width: '100%' }} onClick={getCall} disabled={!ctx || busy}>
           {busy ? 'Thinking…' : 'Get Desk call'}
         </button>
       ) : (
