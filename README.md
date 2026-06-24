@@ -116,5 +116,6 @@ to daily and says so on the chart badge. Source + resolution are shown everywher
 
 - Alpaca and Twelve Data adapters are scaffolded via Settings keys but the app
   works keyless on Binance + Yahoo out of the box.
-- Gemini model defaults to `gemini-2.0-flash` (configurable in Settings).
+- Gemini model defaults to `gemini-2.5-flash` (configurable in Settings;
+  `gemini-2.0-flash` offers higher free-tier throughput if you hit rate limits).
 - Walk-forward is approximated by the IS/OOS split + the rolling decay window.

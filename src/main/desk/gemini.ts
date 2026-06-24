@@ -73,7 +73,7 @@ function model() {
   const s = readSettings()
   if (!s.geminiApiKey) return null
   const genAI = new GoogleGenerativeAI(s.geminiApiKey)
-  return genAI.getGenerativeModel({ model: s.geminiModel || 'gemini-2.0-flash', systemInstruction: SYSTEM_PROMPT })
+  return genAI.getGenerativeModel({ model: s.geminiModel || 'gemini-2.5-flash', systemInstruction: SYSTEM_PROMPT })
 }
 
 export async function deskVerdict(ctx: DeskContext): Promise<DeskVerdict> {

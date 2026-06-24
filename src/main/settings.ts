@@ -3,7 +3,7 @@ import { getSetting, setSetting } from './db'
 
 const DEFAULTS: AppSettings = {
   geminiApiKey: '',
-  geminiModel: 'gemini-2.0-flash',
+  geminiModel: 'gemini-2.5-flash',
   alpacaKey: '',
   alpacaSecret: '',
   twelveDataKey: '',
