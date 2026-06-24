@@ -70,65 +70,90 @@ function fallbackVerdict(ctx: DeskContext, reason: string): DeskVerdict {
 }
 
 // Build a model, optionally with Google Search grounding. Never throws here.
-function makeModel(useSearch: boolean) {
+function makeModel(model: string, useSearch: boolean) {
   const s = readSettings()
   if (!s.geminiApiKey) return null
   const genAI = new GoogleGenerativeAI(s.geminiApiKey)
   // googleSearch is a valid tool for Gemini 2.x but isn't in the SDK's older types.
-  const cfg: Record<string, unknown> = {
-    model: s.geminiModel || 'gemini-2.5-flash',
-    systemInstruction: SYSTEM_PROMPT
-  }
+  const cfg: Record<string, unknown> = { model, systemInstruction: SYSTEM_PROMPT }
   if (useSearch) cfg.tools = [{ googleSearch: {} }]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return genAI.getGenerativeModel(cfg as any)
 }
 
+// Models to try in order — the configured one, then 2.0-flash as an overflow
+// fallback when 2.5-flash returns 503 "high demand".
+function modelChain(): string[] {
+  const s = readSettings()
+  const primary = s.geminiModel || 'gemini-2.5-flash'
+  const chain = [primary]
+  if (primary !== 'gemini-2.0-flash') chain.push('gemini-2.0-flash')
+  return chain
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const isOverloaded = (msg: string) => /503|overloaded|high demand|UNAVAILABLE/i.test(msg)
+
 export async function deskVerdict(ctx: DeskContext): Promise<DeskVerdict> {
   const s = readSettings()
   if (!s.geminiApiKey) return fallbackVerdict(ctx, 'No Gemini API key set — add one in Settings. Showing engine output.')
   const prompt = `Give your first structured verdict for this setup. Respond with ONLY the JSON object.\n\n${contextBlock(ctx)}`
-  // Try with Search grounding first; if the model/SDK rejects the tool, retry plain.
-  for (const useSearch of [true, false]) {
-    try {
-      const m = makeModel(useSearch)
-      if (!m) return fallbackVerdict(ctx, 'No Gemini API key set.')
-      const resp = await m.generateContent(prompt)
-      const text = resp.response.text()
-      const start = text.indexOf('{')
-      const end = text.lastIndexOf('}')
-      if (start === -1 || end === -1) throw new Error('No JSON in response')
-      return JSON.parse(text.slice(start, end + 1)) as DeskVerdict
-    } catch (err) {
-      if (useSearch) continue // grounding may be unsupported — fall back to a plain call
-      return fallbackVerdict(ctx, `Desk error: ${(err as Error).message}`)
+  let lastErr = 'unknown error'
+  for (const model of modelChain()) {
+    for (const useSearch of [true, false]) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const m = makeModel(model, useSearch)
+          if (!m) return fallbackVerdict(ctx, 'No Gemini API key set.')
+          const text = (await m.generateContent(prompt)).response.text()
+          const start = text.indexOf('{')
+          const end = text.lastIndexOf('}')
+          if (start === -1 || end === -1) throw new Error('No JSON in response')
+          return JSON.parse(text.slice(start, end + 1)) as DeskVerdict
+        } catch (err) {
+          lastErr = (err as Error).message
+          if (isOverloaded(lastErr) && attempt === 0) {
+            await sleep(1200)
+            continue // retry same combo once
+          }
+          break // move to next useSearch / model
+        }
+      }
     }
   }
-  return fallbackVerdict(ctx, 'Desk unavailable.')
+  return fallbackVerdict(ctx, `Desk busy (${lastErr.slice(0, 80)}). Engine output shown; try again shortly.`)
 }
 
 export async function deskChat(ctx: DeskContext, history: ChatMessage[], message: string): Promise<string> {
   const s = readSettings()
   if (!s.geminiApiKey) return 'No Gemini API key set. Add one in Settings to chat with the Desk.'
-  for (const useSearch of [true, false]) {
-    try {
-      const m = makeModel(useSearch)
-      if (!m) return 'No Gemini API key set.'
-      const chat = m.startChat({
-        history: [
-          { role: 'user', parts: [{ text: `Context for this conversation:\n${contextBlock(ctx)}` }] },
-          { role: 'model', parts: [{ text: 'Understood. I have the current context and will answer in it.' }] },
-          ...history.slice(0, -1).map((h) => ({ role: h.role, parts: [{ text: h.content }] }))
-        ]
-      })
-      const resp = await chat.sendMessage(message)
-      return resp.response.text()
-    } catch (err) {
-      if (useSearch) continue
-      return `Desk error: ${(err as Error).message}`
+  let lastErr = 'unknown error'
+  for (const model of modelChain()) {
+    for (const useSearch of [true, false]) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const m = makeModel(model, useSearch)
+          if (!m) return 'No Gemini API key set.'
+          const chat = m.startChat({
+            history: [
+              { role: 'user', parts: [{ text: `Context for this conversation:\n${contextBlock(ctx)}` }] },
+              { role: 'model', parts: [{ text: 'Understood. I have the current context and will answer in it.' }] },
+              ...history.slice(0, -1).map((h) => ({ role: h.role, parts: [{ text: h.content }] }))
+            ]
+          })
+          return (await chat.sendMessage(message)).response.text()
+        } catch (err) {
+          lastErr = (err as Error).message
+          if (isOverloaded(lastErr) && attempt === 0) {
+            await sleep(1200)
+            continue
+          }
+          break
+        }
+      }
     }
   }
-  return 'Desk unavailable.'
+  return `Desk busy: ${lastErr}. The model may be overloaded (503) — try again in a moment.`
 }
 
 // Lightweight reachability check for the Settings "Test key" button.
@@ -136,7 +161,7 @@ export async function testGemini(): Promise<{ ok: boolean; message: string }> {
   const s = readSettings()
   if (!s.geminiApiKey) return { ok: false, message: 'No API key saved yet.' }
   try {
-    const m = makeModel(false)
+    const m = makeModel(s.geminiModel || 'gemini-2.5-flash', false)
     if (!m) return { ok: false, message: 'No API key saved yet.' }
     const r = await m.generateContent('Reply with the single word OK')
     const t = r.response.text().trim()

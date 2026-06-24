@@ -10,7 +10,7 @@ import TopBar from './components/TopBar'
 import SettingsModal from './components/SettingsModal'
 
 const BANNER = 'Hypothesis, not a guarantee. Paper-trade before risking capital. Not financial advice.'
-const LIVE_POLL_MS = 15000 // refresh candles
+const LIVE_POLL_MS = 5000 // tick the live price
 const SOFT_REFRESH_MS = 60000 // refresh firing setups / ML
 
 export default function App() {
@@ -46,7 +46,9 @@ export default function App() {
       const a = await window.desk.analyze(sym, iv)
       setAnalysis(a)
       setCandles(a.candles)
-      setSelectedId(a.firingSetups[0]?.setup.id ?? null)
+      // Default selection: a firing setup if any, else the best promoted setup,
+      // so the chart always has markup drawn on it.
+      setSelectedId(a.firingSetups[0]?.setup.id ?? a.promotedSetups[0]?.setup.id ?? null)
     } catch (e) {
       setError((e as Error).message)
       setAnalysis(null)
@@ -110,11 +112,8 @@ export default function App() {
 
   const selectedSetup = useMemo(() => {
     if (!analysis) return null
-    return (
-      analysis.firingSetups.find((f) => f.setup.id === selectedId)?.setup ??
-      analysis.firingSetups[0]?.setup ??
-      null
-    )
+    const list = analysis.promotedSetups
+    return list.find((f) => f.setup.id === selectedId)?.setup ?? list[0]?.setup ?? null
   }, [analysis, selectedId])
 
   const deskCtx: DeskContext | null = useMemo(() => {
@@ -194,12 +193,12 @@ export default function App() {
             onViewport={onViewport}
             fitKey={fitKey}
           />
-          <SetupOverlay chartRef={chartRef} version={version} setup={selectedSetup} />
+          <SetupOverlay chartRef={chartRef} version={version} setup={selectedSetup} zones={analysis?.zones ?? []} />
         </div>
 
         <div className="side">
           <SetupPanel
-            firing={analysis?.firingSetups ?? []}
+            setups={analysis?.promotedSetups ?? []}
             diagnostics={
               analysis?.diagnostics ?? {
                 candidatesTested: 0,

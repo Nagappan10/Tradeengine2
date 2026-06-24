@@ -3,7 +3,7 @@
 
 export type AssetClass = 'crypto' | 'stock' | 'forex' | 'commodity' | 'index'
 
-export type Interval = '5m' | '15m' | '1h' | '4h' | '1d' | '1w'
+export type Interval = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w'
 
 export interface Candle {
   time: number // unix seconds (UTC)
@@ -244,6 +244,7 @@ export interface SymbolAnalysis {
   zones: Zone[]
   swings: Swing[]
   firingSetups: { setup: Setup; stats: SetupStats }[]
+  promotedSetups: { setup: Setup; stats: SetupStats }[]
   diagnostics: ResearchDiagnostics
   ml: MlSignal
   decay: DecayStatus[]

@@ -19,6 +19,7 @@ async function fetchJson(url: string): Promise<any> {
 // ---------------- Binance (crypto, deep intraday) ----------------
 
 const BINANCE_INTERVALS: Record<Interval, string> = {
+  '1m': '1m',
   '5m': '5m',
   '15m': '15m',
   '1h': '1h',
@@ -81,6 +82,7 @@ export class BinanceProvider implements MarketDataProvider {
 // ---------------- Yahoo (stocks/indices/forex/commodities fallback) ----------------
 
 const YAHOO_INTERVALS: Record<Interval, string> = {
+  '1m': '1m',
   '5m': '5m',
   '15m': '15m',
   '1h': '60m',

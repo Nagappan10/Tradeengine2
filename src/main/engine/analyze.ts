@@ -4,7 +4,7 @@ import { detectSwings } from './swings'
 import { detectZones } from './zones'
 import { mlSignal } from './ml'
 import { trackDecay } from './decay'
-import { firingFromPromoted, runResearch } from './research'
+import { currentFromPromoted, runResearch } from './research'
 import { loadPromoted, savePromoted, saveResearchRun } from '../db'
 
 // Full analysis for a symbol: data + zones + firing promoted setups + ML + decay.
@@ -35,7 +35,8 @@ export async function analyzeSymbol(symbol: string, interval: Interval): Promise
     }
   }
 
-  const firingSetups = firingFromPromoted(promoted, candles, symbol, interval)
+  const promotedSetups = currentFromPromoted(promoted, candles, symbol, interval)
+  const firingSetups = promotedSetups.filter((f) => f.setup.firing)
   const ml = mlSignal(candles)
   const decay = trackDecay(promoted, candles, interval)
 
@@ -45,6 +46,7 @@ export async function analyzeSymbol(symbol: string, interval: Interval): Promise
     zones,
     swings,
     firingSetups,
+    promotedSetups,
     diagnostics,
     ml,
     decay

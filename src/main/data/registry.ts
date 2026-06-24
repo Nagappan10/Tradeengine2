@@ -13,6 +13,7 @@ export function resolveProvider(symbol: string): MarketDataProvider {
 }
 
 const INTERVAL_SECONDS: Record<Interval, number> = {
+  '1m': 60,
   '5m': 300,
   '15m': 900,
   '1h': 3600,
@@ -25,6 +26,8 @@ const INTERVAL_SECONDS: Record<Interval, number> = {
 // enough data to validate and train honestly.
 function defaultLookbackSeconds(interval: Interval): number {
   switch (interval) {
+    case '1m':
+      return 3 * 86400
     case '5m':
     case '15m':
       return 30 * 86400
