@@ -47,6 +47,7 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
   const macdSigRef = useRef<ISeriesApi<'Line'> | null>(null)
   const volRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const lastFitKey = useRef<string>('')
+  const prevCandlesRef = useRef<Candle[] | null>(null)
   const themeRef = useRef(theme)
   themeRef.current = theme
 
@@ -169,6 +170,28 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
   useEffect(() => {
     const series = seriesRef.current
     if (!series) return
+
+    // Fast path: only the last (forming) bar changed -> update just that bar so live
+    // ticks are smooth instead of redrawing the whole series and indicators.
+    const prev = prevCandlesRef.current
+    if (
+      prev &&
+      prev.length === candles.length &&
+      candles.length > 1 &&
+      prev[prev.length - 2].time === candles[candles.length - 2].time &&
+      prev[prev.length - 1].time === candles[candles.length - 1].time &&
+      fitKey === lastFitKey.current
+    ) {
+      const k = candles[candles.length - 1]
+      series.update({ time: k.time as UTCTimestamp, open: k.open, high: k.high, low: k.low, close: k.close })
+      const c0 = palette(themeRef.current)
+      volRef.current?.update({ time: k.time as UTCTimestamp, value: k.volume, color: (k.close >= k.open ? c0.up : c0.down) + '66' })
+      prevCandlesRef.current = candles
+      onViewport()
+      return
+    }
+    prevCandlesRef.current = candles
+
     series.setData(
       candles.map((k) => ({ time: k.time as UTCTimestamp, open: k.open, high: k.high, low: k.low, close: k.close }))
     )

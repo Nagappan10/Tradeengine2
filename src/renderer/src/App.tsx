@@ -73,6 +73,7 @@ export default function App() {
   const [cursor, setCursor] = useState<{ t: number; p: number } | null>(null)
   const [showStrategy, setShowStrategy] = useState(false) // clean chart by default
   const [dragging, setDragging] = useState<{ id: string; end: 'a' | 'b' } | null>(null)
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null)
 
   const drawKey = `sd-draw:${symbol}:${interval}`
 
@@ -86,7 +87,37 @@ export default function App() {
     }
     setPending(null)
     setTool('none')
+    setSelectedDrawingId(null)
   }, [symbol, interval])
+
+  const deleteDrawing = useCallback(
+    (id: string) => {
+      setSelectedDrawingId((cur) => (cur === id ? null : cur))
+      setDrawings((prev) => {
+        const next = prev.filter((d) => d.id !== id)
+        try {
+          localStorage.setItem(`sd-draw:${symbol}:${interval}`, JSON.stringify(next))
+        } catch {
+          /* ignore */
+        }
+        return next
+      })
+    },
+    [symbol, interval]
+  )
+
+  // Press Delete/Backspace to remove the selected line.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedDrawingId) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return
+        deleteDrawing(selectedDrawingId)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedDrawingId, deleteDrawing])
 
   // Persist + set drawings together so they survive restarts.
   const saveDrawings = useCallback(
@@ -104,13 +135,44 @@ export default function App() {
     [drawKey]
   )
 
+  // Distance from a point to a drawn line segment, for click-to-select.
+  const hitLine = useCallback(
+    (px: number, py: number): string | null => {
+      const api = chartRef.current
+      if (!api) return null
+      for (const d of drawings) {
+        const x1 = api.timeToX(d.t1)
+        const y1 = api.priceToY(d.p1)
+        const x2 = api.timeToX(d.t2)
+        const y2 = api.priceToY(d.p2)
+        if (x1 == null || y1 == null || x2 == null || y2 == null) continue
+        const dx = x2 - x1
+        const dy = y2 - y1
+        const len2 = dx * dx + dy * dy || 1
+        let tt = ((px - x1) * dx + (py - y1) * dy) / len2
+        tt = Math.max(0, Math.min(1, tt))
+        const cx = x1 + tt * dx
+        const cy = y1 + tt * dy
+        if (Math.hypot(px - cx, py - cy) < 7) return d.id
+      }
+      return null
+    },
+    [drawings]
+  )
+
   const onChartClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       const api = chartRef.current
       if (!api || tool === 'none') return
       const rect = e.currentTarget.getBoundingClientRect()
-      const t = api.xToTime(e.clientX - rect.left)
-      const p = api.yToPrice(e.clientY - rect.top)
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      if (tool === 'edit') {
+        setSelectedDrawingId(hitLine(px, py))
+        return
+      }
+      const t = api.xToTime(px)
+      const p = api.yToPrice(py)
       if (t == null || p == null) return
       if (tool === 'hline') {
         saveDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'hline', t1: t, p1: p, t2: t + 1, p2: p }])
@@ -122,7 +184,7 @@ export default function App() {
         }
       }
     },
-    [tool, pending, saveDrawings]
+    [tool, pending, saveDrawings, hitLine]
   )
 
   // Find a drawing endpoint within ~11px of the cursor (for the edit tool).
@@ -374,7 +436,13 @@ export default function App() {
             zones={showStrategy ? analysis?.zones ?? [] : []}
             trendlines={showStrategy ? analysis?.trendlines ?? [] : []}
             drawings={previewDrawing ? [...drawings, previewDrawing] : drawings}
+            selectedDrawingId={selectedDrawingId}
           />
+          {selectedDrawingId && (
+            <button className="delete-line-btn" onClick={() => deleteDrawing(selectedDrawingId)}>
+              🗑 Delete line
+            </button>
+          )}
           {tool !== 'none' && (
             <div
               className={`draw-layer ${tool === 'edit' ? 'edit' : ''}`}

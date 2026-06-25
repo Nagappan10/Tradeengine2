@@ -1,6 +1,6 @@
 import type { ChatMessage, DeskContext, DeskVerdict } from '@shared/types'
 import { readSettings } from '../settings'
-import { fallbackVerdict } from './prompt'
+import { cleanChatReply, fallbackVerdict, fillVerdict } from './prompt'
 import { gemini } from './gemini'
 import { groq } from './groq'
 import { openrouter } from './openrouter'
@@ -30,7 +30,7 @@ export async function deskVerdict(ctx: DeskContext): Promise<DeskVerdict> {
   const errors: string[] = []
   for (const p of providers) {
     try {
-      return await p.verdict(ctx)
+      return fillVerdict(ctx, await p.verdict(ctx))
     } catch (err) {
       errors.push(`${p.name}: ${(err as Error).message.slice(0, 70)}`)
     }
@@ -44,7 +44,7 @@ export async function deskChat(ctx: DeskContext, history: ChatMessage[], message
   const errors: string[] = []
   for (const p of providers) {
     try {
-      return await p.chat(ctx, history, message)
+      return cleanChatReply(await p.chat(ctx, history, message))
     } catch (err) {
       errors.push(`${p.name}: ${(err as Error).message.slice(0, 70)}`)
     }

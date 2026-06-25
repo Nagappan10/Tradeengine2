@@ -18,12 +18,13 @@ interface Props {
   zones: Zone[]
   trendlines: Trendline[]
   drawings: Drawing[]
+  selectedDrawingId?: string | null
 }
 
 // Draws the full strategy markup directly on the candles:
 // green support box, red resistance box, dashed entry line, green target box,
 // red stop box and a small label. Re-maps prices->pixels on every viewport change.
-export default function SetupOverlay({ chartRef, version, setup, zones, trendlines, drawings }: Props) {
+export default function SetupOverlay({ chartRef, version, setup, zones, trendlines, drawings, selectedDrawingId }: Props) {
   const geom = useMemo(() => {
     const api = chartRef.current
     if (!api) return null
@@ -129,10 +130,19 @@ export default function SetupOverlay({ chartRef, version, setup, zones, trendlin
         ) : null
       )}
 
-      {/* User-drawn lines */}
+      {/* User-drawn lines (selected one is highlighted) */}
       {geom.drawSegs.map((d) =>
         d.s ? (
-          <line key={d.id} x1={d.s.x1} y1={d.s.y1} x2={d.s.x2} y2={d.s.y2} stroke="var(--amber)" strokeWidth={1.6} strokeOpacity={0.9} />
+          <line
+            key={d.id}
+            x1={d.s.x1}
+            y1={d.s.y1}
+            x2={d.s.x2}
+            y2={d.s.y2}
+            stroke={d.id === selectedDrawingId ? bull : 'var(--amber)'}
+            strokeWidth={d.id === selectedDrawingId ? 2.6 : 1.6}
+            strokeOpacity={0.95}
+          />
         ) : null
       )}
 

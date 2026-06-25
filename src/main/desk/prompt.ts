@@ -26,7 +26,39 @@ When asked the first time, respond with ONLY a raw JSON object — no markdown, 
   "risk":"one short sentence on what could go wrong"
 }
 
-For follow-up chat questions, do NOT output JSON — just answer in 2-4 short, simple sentences.`
+For follow-up chat questions, do NOT output JSON or code fences. Reply in 2-4 short, simple sentences only.`
+
+// Fill any blank key levels the model left empty, using the detected zones / setup.
+export function fillVerdict(ctx: DeskContext, v: DeskVerdict): DeskVerdict {
+  const sup = ctx.zones.find((z) => z.kind === 'support')
+  const res = ctx.zones.find((z) => z.kind === 'resistance')
+  const firing = ctx.firingSetups[0]
+  const kl = v.keyLevels || { support: '', resistance: '', invalidation: '' }
+  return {
+    ...v,
+    keyLevels: {
+      support: kl.support?.trim() || (sup ? `${sup.low.toFixed(2)}-${sup.high.toFixed(2)}` : 'n/a'),
+      resistance: kl.resistance?.trim() || (res ? `${res.low.toFixed(2)}-${res.high.toFixed(2)}` : 'n/a'),
+      invalidation: kl.invalidation?.trim() || (firing ? String(firing.setup.stopPrice) : 'n/a')
+    }
+  }
+}
+
+// Strip code fences / stray JSON from a chat reply so the user never sees raw JSON.
+export function cleanChatReply(text: string): string {
+  let t = text.trim()
+  t = t.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim()
+  if (t.startsWith('{') && t.endsWith('}')) {
+    try {
+      const o = JSON.parse(t) as Partial<DeskVerdict>
+      const parts = [o.headline, o.currentRead, o.firingStrategies, o.risk].filter(Boolean)
+      if (parts.length) return parts.join(' ')
+    } catch {
+      /* leave as-is */
+    }
+  }
+  return t
+}
 
 export function contextBlock(ctx: DeskContext): string {
   const setups = ctx.firingSetups.length
