@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { AppSettings, ChatMessage, DeskContext, Interval } from '@shared/types'
-import { getQuote, getSeries, searchSymbols } from './data/registry'
+import { getQuote, getSeries, getTicker, searchSymbols } from './data/registry'
 import { BinanceStream } from './data/binanceStream'
 import { analyzeSymbol, research } from './engine/analyze'
 import { loadAllPromoted } from './db'
@@ -25,6 +25,8 @@ export function registerIpc(): void {
   ipcMain.handle('getCandles', (_e, symbol: string, interval: Interval) => getSeries(symbol, interval))
 
   ipcMain.handle('getQuote', (_e, symbol: string) => getQuote(symbol))
+
+  ipcMain.handle('getTicker', (_e, symbol: string) => getTicker(symbol))
 
   ipcMain.handle('analyze', (_e, symbol: string, interval: Interval) => analyzeSymbol(symbol, interval))
 

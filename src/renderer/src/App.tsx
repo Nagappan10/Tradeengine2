@@ -7,6 +7,7 @@ import SignalsCard from './components/SignalsCard'
 import IndicatorBar from './components/IndicatorBar'
 import DrawToolbar, { DrawTool } from './components/DrawToolbar'
 import StatsWidget from './components/StatsWidget'
+import TickerBar from './components/TickerBar'
 import DeskChat from './components/DeskChat'
 import TopBar from './components/TopBar'
 import SettingsModal from './components/SettingsModal'
@@ -69,6 +70,8 @@ export default function App() {
   const [tool, setTool] = useState<DrawTool>('none')
   const [drawings, setDrawings] = useState<Drawing[]>([])
   const [pending, setPending] = useState<{ t: number; p: number } | null>(null)
+  const [cursor, setCursor] = useState<{ t: number; p: number } | null>(null)
+  const [showStrategy, setShowStrategy] = useState(false) // clean chart by default
 
   // Reset manual drawings when the symbol/timeframe changes.
   useEffect(() => {
@@ -97,6 +100,24 @@ export default function App() {
     },
     [tool, pending]
   )
+
+  const onChartMove = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      const api = chartRef.current
+      if (!api || tool === 'none') return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const t = api.xToTime(e.clientX - rect.left)
+      const p = api.yToPrice(e.clientY - rect.top)
+      if (t != null && p != null) setCursor({ t, p })
+    },
+    [tool]
+  )
+
+  // Live preview line while drawing a trendline (anchor -> cursor).
+  const previewDrawing: Drawing | null =
+    tool === 'trend' && pending && cursor
+      ? { id: 'preview', kind: 'trend', t1: pending.t, p1: pending.p, t2: cursor.t, p2: cursor.p }
+      : null
 
   // Merge a live bar into the series: replace the forming bar, or append a new one.
   const applyLiveBar = useCallback((c: Candle) => {
@@ -243,6 +264,8 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
       />
 
+      <TickerBar symbol={symbol} interval={interval} onPick={setSymbol} />
+
       <div className="body">
         <div className="chart-host">
           {analysis && (
@@ -264,7 +287,12 @@ export default function App() {
               loading…
             </div>
           )}
-          <IndicatorBar overlays={overlays} onToggle={toggleOverlay} />
+          <IndicatorBar
+            overlays={overlays}
+            onToggle={toggleOverlay}
+            showStrategy={showStrategy}
+            onToggleStrategy={() => setShowStrategy((v) => !v)}
+          />
           <DrawToolbar tool={tool} onTool={setTool} onClear={() => setDrawings([])} hasDrawings={drawings.length > 0} />
           {analysis && <StatsWidget symbol={symbol} candles={candles} />}
           <Chart
@@ -278,15 +306,16 @@ export default function App() {
           <SetupOverlay
             chartRef={chartRef}
             version={version}
-            setup={selectedSetup}
-            zones={analysis?.zones ?? []}
-            trendlines={analysis?.trendlines ?? []}
-            drawings={drawings}
+            setup={showStrategy ? selectedSetup : null}
+            zones={showStrategy ? analysis?.zones ?? [] : []}
+            trendlines={showStrategy ? analysis?.trendlines ?? [] : []}
+            drawings={previewDrawing ? [...drawings, previewDrawing] : drawings}
           />
           {tool !== 'none' && (
             <div
               className="draw-layer"
               onClick={onChartClick}
+              onMouseMove={onChartMove}
               title={pending ? 'click the second point' : 'click to draw'}
             />
           )}
@@ -294,7 +323,7 @@ export default function App() {
 
         <button
           className="panel-handle"
-          style={{ right: panelOpen ? 366 : 14 }}
+          style={{ right: panelOpen ? 386 : 14 }}
           onClick={() => setPanelOpen((o) => !o)}
           title={panelOpen ? 'Hide panel (show full chart)' : 'Show panel'}
         >
@@ -315,7 +344,10 @@ export default function App() {
               }
             }
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setSelectedId(id)
+              setShowStrategy(true)
+            }}
             onResearch={runResearch}
             researching={researching}
             loading={loading}

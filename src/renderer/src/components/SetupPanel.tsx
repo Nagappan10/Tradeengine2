@@ -11,6 +11,16 @@ interface Props {
   loading: boolean
 }
 
+// Turn a setup into a plain sentence a beginner can act on.
+function planText(setup: Setup): string {
+  const act = setup.direction === 'long' ? 'Buy' : 'Sell'
+  if (setup.firing) {
+    return `${act} now near ${setup.entryPrice}. Get out at ${setup.stopPrice} if wrong; aim for ${setup.targetPrice}.`
+  }
+  const verb = setup.direction === 'long' ? 'dips to' : 'rises to'
+  return `Wait. If price ${verb} ${setup.entryPrice} (${setup.reasoning}), ${act.toLowerCase()}. Stop ${setup.stopPrice}, target ${setup.targetPrice}.`
+}
+
 function StatRow({ k, v }: { k: string; v: string }) {
   return (
     <div className="kv">
@@ -85,14 +95,18 @@ export default function SetupPanel({
                 <span className={`dir ${setup.direction}`}>{setup.direction.toUpperCase()}</span>
               </div>
               <div style={{ fontSize: 10, color: 'var(--bone-dim)' }}>
-                #{rank + 1} · OOS {(stats.winRate * 100).toFixed(0)}% over {stats.sampleSize} · PF {stats.profitFactor}
-                {setup.firing ? ' · firing now' : ''}
+                #{rank + 1} · won {(stats.winRate * 100).toFixed(0)}% of {stats.sampleSize} past trades · R:R 1:{setup.riskReward}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--bone-dim)', margin: '2px 0 6px' }}>{setup.reasoning}</div>
+
+              {/* Plain-English plan with a clear WAIT / ENTER NOW status. */}
+              <div className={`plan ${setup.firing ? 'firing' : ''}`}>
+                <span className="plan-status">{setup.firing ? '● ENTER NOW' : '○ WAIT'}</span>
+                <span className="plan-text">{planText(setup)}</span>
+              </div>
+
               <StatRow k="entry" v={String(setup.entryPrice)} />
-              <StatRow k="stop" v={String(setup.stopPrice)} />
-              <StatRow k="target" v={String(setup.targetPrice)} />
-              <StatRow k="R:R" v={`1:${setup.riskReward}`} />
+              <StatRow k="stop (max loss)" v={String(setup.stopPrice)} />
+              <StatRow k="target (goal)" v={String(setup.targetPrice)} />
 
               <button
                 style={{ marginTop: 8, width: '100%' }}

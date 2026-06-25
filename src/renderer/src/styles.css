@@ -284,6 +284,118 @@ select:focus {
   background: var(--panel-2);
 }
 
+/* ---- ticker tape: other assets + IST clock + candle countdown ---- */
+.ticker-bar {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--glass-sheen), transparent), var(--panel);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  z-index: 19;
+}
+.ticker-tape {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: none;
+}
+.ticker-tape::-webkit-scrollbar {
+  display: none;
+}
+.ticker-item {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 3px 9px;
+  border: 1px solid var(--glass-border);
+  border-radius: 7px;
+  background: var(--panel-2);
+  box-shadow: none;
+  transform: none;
+}
+.ticker-item:hover {
+  border-color: var(--amber);
+  box-shadow: none;
+  transform: none;
+}
+.ticker-item.active {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+.ticker-item .tk-sym {
+  color: var(--bone);
+  font-weight: 700;
+}
+.ticker-item .tk-px {
+  color: var(--bone-dim);
+}
+.ticker-clock {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--bone-dim);
+  white-space: nowrap;
+}
+
+.strat-toggle.active {
+  color: var(--amber) !important;
+  background: var(--amber-soft) !important;
+}
+.ib-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--glass-border);
+  margin: 0 2px;
+}
+
+/* ---- plain-English trade plan inside a setup card ---- */
+.plan {
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--glass-border);
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+}
+.plan.firing {
+  border-color: color-mix(in srgb, var(--bull) 55%, transparent);
+  background: color-mix(in srgb, var(--bull) 12%, var(--panel-2));
+}
+.plan-status {
+  display: block;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  margin-bottom: 3px;
+  color: var(--amber);
+}
+.plan.firing .plan-status {
+  color: var(--bull);
+}
+.plan-text {
+  color: var(--bone);
+}
+
+/* ---- distinct, friendlier font for the Desk coach ---- */
+.desk-panel .msg,
+.desk-panel .verdict,
+.desk-panel .chat-input input {
+  font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+}
+.desk-panel .chat-log {
+  max-height: 380px;
+}
+
 .body {
   flex: 1;
   position: relative;
@@ -343,7 +455,7 @@ select:focus {
 .indicator-bar {
   position: absolute;
   top: 12px;
-  right: 374px;
+  right: 394px;
   z-index: 6;
   display: flex;
   gap: 4px;
@@ -515,7 +627,7 @@ button.tiny {
   top: 14px;
   right: 14px;
   bottom: 14px;
-  width: 340px;
+  width: 360px;
   display: flex;
   flex-direction: column;
   gap: 14px;

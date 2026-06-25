@@ -96,8 +96,8 @@ export default function DeskChat({ ctx }: Props) {
   }
 
   return (
-    <div className="glass">
-      <h3 className="section-title">Desk — ask anything</h3>
+    <div className="glass desk-panel">
+      <h3 className="section-title">Desk — your trading coach</h3>
 
       {!verdict ? (
         <button className="primary" style={{ width: '100%' }} onClick={getCall} disabled={!ctx || busy}>

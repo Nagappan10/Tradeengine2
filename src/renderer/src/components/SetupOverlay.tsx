@@ -32,13 +32,17 @@ export default function SetupOverlay({ chartRef, version, setup, zones, trendlin
 
     const clamp = (y: number | null): number | null => (y == null ? null : Math.max(0, Math.min(height, y)))
 
-    // Map the detected S/R zones so they're always visible, even with no setup.
-    const zoneRects = zones.slice(0, 8).map((z) => ({
-      kind: z.kind,
-      touches: z.touches,
-      yLow: clamp(api.priceToY(z.low)),
-      yHigh: clamp(api.priceToY(z.high))
-    }))
+    // Map the strongest few S/R zones. Skip any band that would fill more than ~18%
+    // of the chart height (those are the "covers the whole chart" glitch).
+    const zoneRects = zones
+      .slice(0, 3)
+      .map((z) => ({
+        kind: z.kind,
+        touches: z.touches,
+        yLow: clamp(api.priceToY(z.low)),
+        yHigh: clamp(api.priceToY(z.high))
+      }))
+      .filter((z) => z.yLow != null && z.yHigh != null && Math.abs((z.yLow as number) - (z.yHigh as number)) < height * 0.18)
 
     // Map a (t1,p1)-(t2,p2) segment to pixels, extended to the right edge.
     const seg = (t1: number, p1: number, t2: number, p2: number) => {

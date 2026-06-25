@@ -20,6 +20,12 @@ export interface Quote {
   time: number
 }
 
+export interface Ticker {
+  symbol: string
+  price: number
+  changePct: number // % change over the lookback (24h crypto / prev close equities)
+}
+
 export interface SeriesMeta {
   symbol: string
   interval: Interval
@@ -277,6 +283,7 @@ export interface DeskBridge {
   searchSymbols(query: string): Promise<{ symbol: string; name: string; assetClass: AssetClass; source: string }[]>
   getCandles(symbol: string, interval: Interval): Promise<CandleSeries>
   getQuote(symbol: string): Promise<Quote>
+  getTicker(symbol: string): Promise<Ticker>
   subscribeStream(symbol: string, interval: Interval): Promise<boolean>
   unsubscribeStream(): Promise<void>
   onStreamCandle(cb: (candle: Candle, closed: boolean) => void): () => void

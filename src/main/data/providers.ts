@@ -1,4 +1,4 @@
-import type { AssetClass, Candle, Interval, Quote } from '@shared/types'
+import type { AssetClass, Candle, Interval, Quote, Ticker } from '@shared/types'
 
 export interface MarketDataProvider {
   id: string
@@ -8,6 +8,7 @@ export interface MarketDataProvider {
   resolve(symbol: string): string | null
   getCandles(symbol: string, interval: Interval, from: number, to: number): Promise<{ candles: Candle[]; resolution: Interval }>
   getLatest(symbol: string): Promise<Quote>
+  getTicker(symbol: string): Promise<Ticker>
 }
 
 async function fetchJson(url: string): Promise<any> {
@@ -77,6 +78,12 @@ export class BinanceProvider implements MarketDataProvider {
     const data = await fetchJson(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`)
     return { symbol, price: parseFloat(data.price), time: Math.floor(Date.now() / 1000) }
   }
+  async getTicker(symbol: string): Promise<Ticker> {
+    const sym = this.resolve(symbol)
+    if (!sym) throw new Error(`Binance cannot resolve ${symbol}`)
+    const data = await fetchJson(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`)
+    return { symbol, price: parseFloat(data.lastPrice), changePct: parseFloat(data.priceChangePercent) }
+  }
 }
 
 // ---------------- Yahoo (stocks/indices/forex/commodities fallback) ----------------
@@ -133,5 +140,17 @@ export class YahooProvider implements MarketDataProvider {
     const result = data?.chart?.result?.[0]
     const price = result?.meta?.regularMarketPrice ?? 0
     return { symbol, price, time: Math.floor(Date.now() / 1000) }
+  }
+  async getTicker(symbol: string): Promise<Ticker> {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      symbol.toUpperCase()
+    )}?interval=1d&range=5d`
+    const data = await fetchJson(url)
+    const result = data?.chart?.result?.[0]
+    const meta = result?.meta ?? {}
+    const price = meta.regularMarketPrice ?? 0
+    const prev = meta.chartPreviousClose ?? meta.previousClose ?? price
+    const changePct = prev ? ((price - prev) / prev) * 100 : 0
+    return { symbol, price, changePct }
   }
 }
