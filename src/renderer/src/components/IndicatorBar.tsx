@@ -10,7 +10,9 @@ interface Props {
 const LABELS: { key: keyof Overlays; label: string }[] = [
   { key: 'ema', label: 'EMA 20/50' },
   { key: 'bb', label: 'Bollinger' },
-  { key: 'volume', label: 'Volume' }
+  { key: 'volume', label: 'Volume' },
+  { key: 'rsi', label: 'RSI' },
+  { key: 'macd', label: 'MACD' }
 ]
 
 // Chart controls: a prominent Strategy on/off toggle (clean chart by default) plus

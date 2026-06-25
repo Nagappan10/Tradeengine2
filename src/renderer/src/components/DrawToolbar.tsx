@@ -1,4 +1,4 @@
-export type DrawTool = 'none' | 'trend' | 'hline'
+export type DrawTool = 'none' | 'trend' | 'hline' | 'edit'
 
 interface Props {
   tool: DrawTool
@@ -8,9 +8,10 @@ interface Props {
 }
 
 const TOOLS: { key: DrawTool; label: string; title: string }[] = [
-  { key: 'none', label: '⌖', title: 'Cursor' },
+  { key: 'none', label: '⌖', title: 'Cursor / pan' },
   { key: 'trend', label: '╱', title: 'Trendline (click two points)' },
-  { key: 'hline', label: '─', title: 'Horizontal line (click a level)' }
+  { key: 'hline', label: '─', title: 'Horizontal line (click a level)' },
+  { key: 'edit', label: '✥', title: 'Move / edit lines (drag an endpoint)' }
 ]
 
 // Minimal TradingView-style drawing tools — intentionally small, not a clone.

@@ -29,7 +29,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [live, setLive] = useState(false)
   const [researching, setResearching] = useState(false)
-  const [overlays, setOverlays] = useState<Overlays>({ ema: true, bb: false, volume: true })
+  const [overlays, setOverlays] = useState<Overlays>({ ema: true, bb: false, volume: true, rsi: false, macd: false })
 
   const chartRef = useRef<ChartHandle>(null)
   const fitKey = `${symbol}|${interval}`
@@ -72,13 +72,37 @@ export default function App() {
   const [pending, setPending] = useState<{ t: number; p: number } | null>(null)
   const [cursor, setCursor] = useState<{ t: number; p: number } | null>(null)
   const [showStrategy, setShowStrategy] = useState(false) // clean chart by default
+  const [dragging, setDragging] = useState<{ id: string; end: 'a' | 'b' } | null>(null)
 
-  // Reset manual drawings when the symbol/timeframe changes.
+  const drawKey = `sd-draw:${symbol}:${interval}`
+
+  // Load saved drawings for this symbol/timeframe (persisted across restarts).
   useEffect(() => {
-    setDrawings([])
+    try {
+      const raw = localStorage.getItem(`sd-draw:${symbol}:${interval}`)
+      setDrawings(raw ? (JSON.parse(raw) as Drawing[]) : [])
+    } catch {
+      setDrawings([])
+    }
     setPending(null)
     setTool('none')
   }, [symbol, interval])
+
+  // Persist + set drawings together so they survive restarts.
+  const saveDrawings = useCallback(
+    (updater: Drawing[] | ((prev: Drawing[]) => Drawing[])) => {
+      setDrawings((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        try {
+          localStorage.setItem(drawKey, JSON.stringify(next))
+        } catch {
+          /* ignore quota */
+        }
+        return next
+      })
+    },
+    [drawKey]
+  )
 
   const onChartClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -89,16 +113,44 @@ export default function App() {
       const p = api.yToPrice(e.clientY - rect.top)
       if (t == null || p == null) return
       if (tool === 'hline') {
-        setDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'hline', t1: t, p1: p, t2: t + 1, p2: p }])
+        saveDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'hline', t1: t, p1: p, t2: t + 1, p2: p }])
       } else if (tool === 'trend') {
         if (!pending) setPending({ t, p })
         else {
-          setDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'trend', t1: pending.t, p1: pending.p, t2: t, p2: p }])
+          saveDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'trend', t1: pending.t, p1: pending.p, t2: t, p2: p }])
           setPending(null)
         }
       }
     },
-    [tool, pending]
+    [tool, pending, saveDrawings]
+  )
+
+  // Find a drawing endpoint within ~11px of the cursor (for the edit tool).
+  const hitEndpoint = useCallback(
+    (px: number, py: number): { id: string; end: 'a' | 'b' } | null => {
+      const api = chartRef.current
+      if (!api) return null
+      for (const d of drawings) {
+        const ax = api.timeToX(d.t1)
+        const ay = api.priceToY(d.p1)
+        const bx = api.timeToX(d.t2)
+        const by = api.priceToY(d.p2)
+        if (ax != null && ay != null && Math.hypot(ax - px, ay - py) < 11) return { id: d.id, end: 'a' }
+        if (bx != null && by != null && Math.hypot(bx - px, by - py) < 11) return { id: d.id, end: 'b' }
+      }
+      return null
+    },
+    [drawings]
+  )
+
+  const onChartDown = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (tool !== 'edit') return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const hit = hitEndpoint(e.clientX - rect.left, e.clientY - rect.top)
+      if (hit) setDragging(hit)
+    },
+    [tool, hitEndpoint]
   )
 
   const onChartMove = useCallback(
@@ -108,10 +160,22 @@ export default function App() {
       const rect = e.currentTarget.getBoundingClientRect()
       const t = api.xToTime(e.clientX - rect.left)
       const p = api.yToPrice(e.clientY - rect.top)
-      if (t != null && p != null) setCursor({ t, p })
+      if (t == null || p == null) return
+      setCursor({ t, p })
+      if (dragging) {
+        saveDrawings((ds) =>
+          ds.map((d) => {
+            if (d.id !== dragging.id) return d
+            if (d.kind === 'hline') return { ...d, p1: p, p2: p } // move the whole level
+            return dragging.end === 'a' ? { ...d, t1: t, p1: p } : { ...d, t2: t, p2: p }
+          })
+        )
+      }
     },
-    [tool]
+    [tool, dragging, saveDrawings]
   )
+
+  const onChartUp = useCallback(() => setDragging(null), [])
 
   // Live preview line while drawing a trendline (anchor -> cursor).
   const previewDrawing: Drawing | null =
@@ -293,7 +357,7 @@ export default function App() {
             showStrategy={showStrategy}
             onToggleStrategy={() => setShowStrategy((v) => !v)}
           />
-          <DrawToolbar tool={tool} onTool={setTool} onClear={() => setDrawings([])} hasDrawings={drawings.length > 0} />
+          <DrawToolbar tool={tool} onTool={setTool} onClear={() => saveDrawings([])} hasDrawings={drawings.length > 0} />
           {analysis && <StatsWidget symbol={symbol} candles={candles} />}
           <Chart
             ref={chartRef}
@@ -313,10 +377,19 @@ export default function App() {
           />
           {tool !== 'none' && (
             <div
-              className="draw-layer"
+              className={`draw-layer ${tool === 'edit' ? 'edit' : ''}`}
               onClick={onChartClick}
+              onMouseDown={onChartDown}
               onMouseMove={onChartMove}
-              title={pending ? 'click the second point' : 'click to draw'}
+              onMouseUp={onChartUp}
+              onMouseLeave={onChartUp}
+              title={
+                tool === 'edit'
+                  ? 'drag an endpoint to move a line'
+                  : pending
+                    ? 'click the second point'
+                    : 'click to draw'
+              }
             />
           )}
         </div>

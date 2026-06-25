@@ -1,7 +1,7 @@
 import { createChart, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { Candle } from '@shared/types'
-import { bollinger, ema } from '@shared/indicators'
+import { bollinger, ema, macd, rsi } from '@shared/indicators'
 
 export interface ChartHandle {
   priceToY(price: number): number | null
@@ -15,6 +15,8 @@ export interface Overlays {
   ema: boolean
   bb: boolean
   volume: boolean
+  rsi: boolean
+  macd: boolean
 }
 
 interface Props {
@@ -39,6 +41,10 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
   const emaSlowRef = useRef<ISeriesApi<'Line'> | null>(null)
   const bbUpRef = useRef<ISeriesApi<'Line'> | null>(null)
   const bbLoRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const rsiRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const macdHistRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+  const macdLineRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const macdSigRef = useRef<ISeriesApi<'Line'> | null>(null)
   const volRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const lastFitKey = useRef<string>('')
   const themeRef = useRef(theme)
@@ -94,6 +100,14 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
     const bbUp = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, priceScaleId: 'left' })
     const bbLo = chart.addLineSeries({ color: c.dim, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, priceScaleId: 'left' })
 
+    // RSI / MACD oscillator panes, each pinned to the bottom band, hidden by default.
+    const rsiLine = chart.addLineSeries({ color: '#c98fe0', lineWidth: 1, priceScaleId: 'rsi', lastValueVisible: false, priceLineVisible: false, visible: false })
+    rsiLine.createPriceLine({ price: 70, color: 'rgba(224,108,94,0.5)', lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' })
+    rsiLine.createPriceLine({ price: 30, color: 'rgba(95,185,154,0.5)', lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' })
+    const macdHist = chart.addHistogramSeries({ priceScaleId: 'macd', lastValueVisible: false, priceLineVisible: false, visible: false })
+    const macdLine = chart.addLineSeries({ color: '#6aa0d8', lineWidth: 1, priceScaleId: 'macd', lastValueVisible: false, priceLineVisible: false, visible: false })
+    const macdSig = chart.addLineSeries({ color: c.amber, lineWidth: 1, priceScaleId: 'macd', lastValueVisible: false, priceLineVisible: false, visible: false })
+
     chartRef.current = chart
     seriesRef.current = series
     volRef.current = vol
@@ -101,6 +115,10 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
     emaSlowRef.current = emaSlow
     bbUpRef.current = bbUp
     bbLoRef.current = bbLo
+    rsiRef.current = rsiLine
+    macdHistRef.current = macdHist
+    macdLineRef.current = macdLine
+    macdSigRef.current = macdSig
 
     const fire = () => onViewport()
     chart.timeScale().subscribeVisibleTimeRangeChange(fire)
@@ -174,6 +192,16 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
     setLine(bbUpRef.current, bb.upper)
     setLine(bbLoRef.current, bb.lower)
 
+    setLine(rsiRef.current, rsi(closes, 14))
+    const m = macd(closes)
+    macdHistRef.current?.setData(
+      times
+        .map((t, i) => ({ time: t, value: m[i].hist, color: (m[i].hist ?? 0) >= 0 ? c.up + '88' : c.down + '88' }))
+        .filter((p) => p.value != null) as { time: UTCTimestamp; value: number; color: string }[]
+    )
+    setLine(macdLineRef.current, m.map((p) => p.macd))
+    setLine(macdSigRef.current, m.map((p) => p.signal))
+
     if (fitKey !== lastFitKey.current) {
       chartRef.current?.timeScale().fitContent()
       lastFitKey.current = fitKey
@@ -182,13 +210,27 @@ const Chart = forwardRef<ChartHandle, Props>(({ candles, theme, overlays, onView
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candles, fitKey])
 
-  // toggle indicator visibility
+  // toggle indicator visibility + compress price into the top band when an
+  // oscillator pane (RSI/MACD) is shown, so they stack like TradingView panes.
   useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
     emaFastRef.current?.applyOptions({ visible: overlays.ema })
     emaSlowRef.current?.applyOptions({ visible: overlays.ema })
     bbUpRef.current?.applyOptions({ visible: overlays.bb })
     bbLoRef.current?.applyOptions({ visible: overlays.bb })
     volRef.current?.applyOptions({ visible: overlays.volume })
+    rsiRef.current?.applyOptions({ visible: overlays.rsi })
+    macdHistRef.current?.applyOptions({ visible: overlays.macd })
+    macdLineRef.current?.applyOptions({ visible: overlays.macd })
+    macdSigRef.current?.applyOptions({ visible: overlays.macd })
+
+    const osc = overlays.rsi || overlays.macd
+    chart.priceScale('left').applyOptions({ scaleMargins: { top: 0.06, bottom: osc ? 0.34 : 0.12 } })
+    if (overlays.rsi) chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.7, bottom: 0 } })
+    if (overlays.macd) chart.priceScale('macd').applyOptions({ scaleMargins: { top: 0.7, bottom: 0 } })
+    onViewport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlays])
 
   return <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />

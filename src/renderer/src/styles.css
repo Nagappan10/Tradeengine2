@@ -524,6 +524,12 @@ button.tiny {
   z-index: 7;
   cursor: crosshair;
 }
+.draw-layer.edit {
+  cursor: grab;
+}
+.draw-layer.edit:active {
+  cursor: grabbing;
+}
 
 /* vertical drawing toolbar on the left edge of the chart */
 .draw-toolbar {
