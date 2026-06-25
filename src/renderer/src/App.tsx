@@ -1,33 +1,43 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { DeskContext, Interval, MaskedSettings, SymbolAnalysis } from '@shared/types'
-import Chart, { ChartHandle } from './components/Chart'
-import SetupOverlay from './components/SetupOverlay'
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Candle, DeskContext, Interval, MaskedSettings, SymbolAnalysis } from '@shared/types'
+import Chart, { ChartHandle, Overlays } from './components/Chart'
+import SetupOverlay, { Drawing } from './components/SetupOverlay'
 import SetupPanel from './components/SetupPanel'
+import SignalsCard from './components/SignalsCard'
+import IndicatorBar from './components/IndicatorBar'
+import DrawToolbar, { DrawTool } from './components/DrawToolbar'
+import StatsWidget from './components/StatsWidget'
+import TickerBar from './components/TickerBar'
 import DeskChat from './components/DeskChat'
 import TopBar from './components/TopBar'
 import SettingsModal from './components/SettingsModal'
 
 const BANNER = 'Hypothesis, not a guarantee. Paper-trade before risking capital. Not financial advice.'
+const LIVE_POLL_MS = 3000 // tick the live price (non-crypto fallback)
+const SOFT_REFRESH_MS = 60000 // refresh firing setups / ML
 
 export default function App() {
   const [symbol, setSymbol] = useState('BTCUSDT')
-  const [interval, setInterval] = useState<Interval>('1d') // default to Daily
+  const [interval, setInterval] = useState<Interval>('1d')
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [analysis, setAnalysis] = useState<SymbolAnalysis | null>(null)
+  const [candles, setCandles] = useState<Candle[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
+  const [live, setLive] = useState(false)
+  const [researching, setResearching] = useState(false)
+  const [overlays, setOverlays] = useState<Overlays>({ ema: true, bb: false, volume: true, rsi: false, macd: false })
 
   const chartRef = useRef<ChartHandle>(null)
+  const fitKey = `${symbol}|${interval}`
 
-  // apply theme to :root for CSS variables + chart colors
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  // load persisted theme from settings once
   useEffect(() => {
     window.desk.getSettings().then((s: MaskedSettings) => setTheme(s.theme))
   }, [])
@@ -38,10 +48,14 @@ export default function App() {
     try {
       const a = await window.desk.analyze(sym, iv)
       setAnalysis(a)
-      setSelectedId(a.firingSetups[0]?.setup.id ?? null)
+      setCandles(a.candles)
+      // Default selection: a firing setup if any, else the best promoted setup,
+      // so the chart always has markup drawn on it.
+      setSelectedId(a.firingSetups[0]?.setup.id ?? a.promotedSetups[0]?.setup.id ?? null)
     } catch (e) {
       setError((e as Error).message)
       setAnalysis(null)
+      setCandles([])
     } finally {
       setLoading(false)
     }
@@ -51,11 +65,281 @@ export default function App() {
     load(symbol, interval)
   }, [symbol, interval, load])
 
+  const [streaming, setStreaming] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)
+  const [tool, setTool] = useState<DrawTool>('none')
+  const [drawings, setDrawings] = useState<Drawing[]>([])
+  const [pending, setPending] = useState<{ t: number; p: number } | null>(null)
+  const [cursor, setCursor] = useState<{ t: number; p: number } | null>(null)
+  const [showStrategy, setShowStrategy] = useState(false) // clean chart by default
+  const [dragging, setDragging] = useState<{ id: string; end: 'a' | 'b' } | null>(null)
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null)
+
+  const drawKey = `sd-draw:${symbol}:${interval}`
+
+  // Load saved drawings for this symbol/timeframe (persisted across restarts).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`sd-draw:${symbol}:${interval}`)
+      setDrawings(raw ? (JSON.parse(raw) as Drawing[]) : [])
+    } catch {
+      setDrawings([])
+    }
+    setPending(null)
+    setTool('none')
+    setSelectedDrawingId(null)
+  }, [symbol, interval])
+
+  const deleteDrawing = useCallback(
+    (id: string) => {
+      setSelectedDrawingId((cur) => (cur === id ? null : cur))
+      setDrawings((prev) => {
+        const next = prev.filter((d) => d.id !== id)
+        try {
+          localStorage.setItem(`sd-draw:${symbol}:${interval}`, JSON.stringify(next))
+        } catch {
+          /* ignore */
+        }
+        return next
+      })
+    },
+    [symbol, interval]
+  )
+
+  // Press Delete/Backspace to remove the selected line.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedDrawingId) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return
+        deleteDrawing(selectedDrawingId)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedDrawingId, deleteDrawing])
+
+  // Persist + set drawings together so they survive restarts.
+  const saveDrawings = useCallback(
+    (updater: Drawing[] | ((prev: Drawing[]) => Drawing[])) => {
+      setDrawings((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        try {
+          localStorage.setItem(drawKey, JSON.stringify(next))
+        } catch {
+          /* ignore quota */
+        }
+        return next
+      })
+    },
+    [drawKey]
+  )
+
+  // Distance from a point to a drawn line segment, for click-to-select.
+  const hitLine = useCallback(
+    (px: number, py: number): string | null => {
+      const api = chartRef.current
+      if (!api) return null
+      for (const d of drawings) {
+        const x1 = api.timeToX(d.t1)
+        const y1 = api.priceToY(d.p1)
+        const x2 = api.timeToX(d.t2)
+        const y2 = api.priceToY(d.p2)
+        if (x1 == null || y1 == null || x2 == null || y2 == null) continue
+        const dx = x2 - x1
+        const dy = y2 - y1
+        const len2 = dx * dx + dy * dy || 1
+        let tt = ((px - x1) * dx + (py - y1) * dy) / len2
+        tt = Math.max(0, Math.min(1, tt))
+        const cx = x1 + tt * dx
+        const cy = y1 + tt * dy
+        if (Math.hypot(px - cx, py - cy) < 7) return d.id
+      }
+      return null
+    },
+    [drawings]
+  )
+
+  const onChartClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      const api = chartRef.current
+      if (!api || tool === 'none') return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      if (tool === 'edit') {
+        setSelectedDrawingId(hitLine(px, py))
+        return
+      }
+      const t = api.xToTime(px)
+      const p = api.yToPrice(py)
+      if (t == null || p == null) return
+      if (tool === 'hline') {
+        saveDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'hline', t1: t, p1: p, t2: t + 1, p2: p }])
+      } else if (tool === 'trend') {
+        if (!pending) setPending({ t, p })
+        else {
+          saveDrawings((d) => [...d, { id: `d${Date.now()}`, kind: 'trend', t1: pending.t, p1: pending.p, t2: t, p2: p }])
+          setPending(null)
+        }
+      }
+    },
+    [tool, pending, saveDrawings, hitLine]
+  )
+
+  // Find a drawing endpoint within ~11px of the cursor (for the edit tool).
+  const hitEndpoint = useCallback(
+    (px: number, py: number): { id: string; end: 'a' | 'b' } | null => {
+      const api = chartRef.current
+      if (!api) return null
+      for (const d of drawings) {
+        const ax = api.timeToX(d.t1)
+        const ay = api.priceToY(d.p1)
+        const bx = api.timeToX(d.t2)
+        const by = api.priceToY(d.p2)
+        if (ax != null && ay != null && Math.hypot(ax - px, ay - py) < 11) return { id: d.id, end: 'a' }
+        if (bx != null && by != null && Math.hypot(bx - px, by - py) < 11) return { id: d.id, end: 'b' }
+      }
+      return null
+    },
+    [drawings]
+  )
+
+  const onChartDown = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (tool !== 'edit') return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const hit = hitEndpoint(e.clientX - rect.left, e.clientY - rect.top)
+      if (hit) setDragging(hit)
+    },
+    [tool, hitEndpoint]
+  )
+
+  const onChartMove = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      const api = chartRef.current
+      if (!api || tool === 'none') return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const t = api.xToTime(e.clientX - rect.left)
+      const p = api.yToPrice(e.clientY - rect.top)
+      if (t == null || p == null) return
+      setCursor({ t, p })
+      if (dragging) {
+        saveDrawings((ds) =>
+          ds.map((d) => {
+            if (d.id !== dragging.id) return d
+            if (d.kind === 'hline') return { ...d, p1: p, p2: p } // move the whole level
+            return dragging.end === 'a' ? { ...d, t1: t, p1: p } : { ...d, t2: t, p2: p }
+          })
+        )
+      }
+    },
+    [tool, dragging, saveDrawings]
+  )
+
+  const onChartUp = useCallback(() => setDragging(null), [])
+
+  // Live preview line while drawing a trendline (anchor -> cursor).
+  const previewDrawing: Drawing | null =
+    tool === 'trend' && pending && cursor
+      ? { id: 'preview', kind: 'trend', t1: pending.t, p1: pending.p, t2: cursor.t, p2: cursor.p }
+      : null
+
+  // Merge a live bar into the series: replace the forming bar, or append a new one.
+  const applyLiveBar = useCallback((c: Candle) => {
+    setCandles((prev) => {
+      if (!prev.length) return prev
+      const next = prev.slice()
+      const last = next[next.length - 1]
+      if (c.time === last.time) next[next.length - 1] = c
+      else if (c.time > last.time) next.push(c)
+      else return prev
+      return next
+    })
+  }, [])
+
+  // Real-time Binance WebSocket for crypto — true tick-by-tick updates.
+  useEffect(() => {
+    let unsub: (() => void) | null = null
+    let cancelled = false
+    let gotData = false
+    setStreaming(false)
+
+    window.desk.subscribeStream(symbol, interval).then((active) => {
+      if (cancelled) return
+      setStreaming(active)
+      setLive(active)
+    })
+    unsub = window.desk.onStreamCandle((candle) => {
+      gotData = true
+      applyLiveBar(candle)
+      setLive(true)
+    })
+    // Watchdog: if the socket connects but delivers nothing (blocked / non-crypto),
+    // drop back to quote polling instead of leaving the chart frozen.
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled && !gotData) setStreaming(false)
+    }, 8000)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(watchdog)
+      if (unsub) unsub()
+      window.desk.unsubscribeStream()
+    }
+  }, [symbol, interval, applyLiveBar])
+
+  // Fallback quote polling for non-crypto (no WebSocket) — ticks the forming bar.
+  useEffect(() => {
+    if (error || streaming) return
+    let stop = false
+    const tick = async () => {
+      try {
+        const q = await window.desk.getQuote(symbol)
+        if (stop || !q.price) return
+        setLive(true)
+        setCandles((prev) => {
+          if (!prev.length) return prev
+          const next = prev.slice()
+          const last = { ...next[next.length - 1] }
+          last.close = q.price
+          last.high = Math.max(last.high, q.price)
+          last.low = Math.min(last.low, q.price)
+          next[next.length - 1] = last
+          return next
+        })
+      } catch {
+        if (!stop) setLive(false)
+      }
+    }
+    const id = window.setInterval(tick, LIVE_POLL_MS)
+    return () => {
+      stop = true
+      window.clearInterval(id)
+    }
+  }, [symbol, interval, error, streaming])
+
+  // Periodic soft refresh of firing setups / ML (no loading shimmer).
+  useEffect(() => {
+    if (error) return
+    const id = window.setInterval(async () => {
+      try {
+        const a = await window.desk.analyze(symbol, interval)
+        setAnalysis(a)
+        setCandles(a.candles)
+      } catch {
+        /* keep last good analysis */
+      }
+    }, SOFT_REFRESH_MS)
+    return () => window.clearInterval(id)
+  }, [symbol, interval, error])
+
   const onViewport = useCallback(() => setVersion((v) => v + 1), [])
 
   const selectedSetup = useMemo(() => {
     if (!analysis) return null
-    return analysis.firingSetups.find((f) => f.setup.id === selectedId)?.setup ?? analysis.firingSetups[0]?.setup ?? null
+    const list = analysis.promotedSetups
+    return list.find((f) => f.setup.id === selectedId)?.setup ?? list[0]?.setup ?? null
   }, [analysis, selectedId])
 
   const deskCtx: DeskContext | null = useMemo(() => {
@@ -77,6 +361,23 @@ export default function App() {
     window.desk.saveSettings({ theme: next })
   }
 
+  const runResearch = async () => {
+    if (researching) return
+    setResearching(true)
+    try {
+      await window.desk.runResearch(symbol, interval)
+      await load(symbol, interval)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setResearching(false)
+    }
+  }
+
+  const toggleOverlay = (key: keyof Overlays) => setOverlays((o) => ({ ...o, [key]: !o[key] }))
+
+  const lastPrice = candles.length ? candles[candles.length - 1].close : null
+
   return (
     <div className="app">
       <TopBar
@@ -89,26 +390,90 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
       />
 
+      <TickerBar symbol={symbol} interval={interval} onPick={setSymbol} />
+
       <div className="body">
         <div className="chart-host">
           {analysis && (
             <div className="chart-badge mono">
-              {analysis.meta.source} · {analysis.meta.resolution}
-              {analysis.meta.degraded ? ' · degraded→daily' : ''} · {analysis.candles.length} bars
+              <span className={`live-dot ${live ? 'on' : ''}`} />
+              {symbol} · {analysis.meta.source} · {analysis.meta.resolution}
+              {streaming ? ' · live stream' : ' · delayed'}
+              {analysis.meta.degraded ? ' · degraded→daily' : ''}
+              {lastPrice != null ? ` · ${lastPrice}` : ''} · {candles.length} bars
             </div>
           )}
           {error && (
-            <div className="chart-badge mono" style={{ top: 40, color: 'var(--bear)' }}>
+            <div className="chart-badge mono" style={{ top: 44, color: 'var(--bear)' }}>
               {error}
             </div>
           )}
-          <Chart ref={chartRef} candles={analysis?.candles ?? []} theme={theme} onViewport={onViewport} />
-          <SetupOverlay chartRef={chartRef} version={version} setup={selectedSetup} />
+          {loading && !analysis && (
+            <div className="chart-badge mono" style={{ top: 44 }}>
+              loading…
+            </div>
+          )}
+          <IndicatorBar
+            overlays={overlays}
+            onToggle={toggleOverlay}
+            showStrategy={showStrategy}
+            onToggleStrategy={() => setShowStrategy((v) => !v)}
+          />
+          <DrawToolbar tool={tool} onTool={setTool} onClear={() => saveDrawings([])} hasDrawings={drawings.length > 0} />
+          {analysis && <StatsWidget symbol={symbol} candles={candles} />}
+          <Chart
+            ref={chartRef}
+            candles={candles}
+            theme={theme}
+            overlays={overlays}
+            onViewport={onViewport}
+            fitKey={fitKey}
+          />
+          <SetupOverlay
+            chartRef={chartRef}
+            version={version}
+            setup={showStrategy ? selectedSetup : null}
+            zones={showStrategy ? analysis?.zones ?? [] : []}
+            trendlines={showStrategy ? analysis?.trendlines ?? [] : []}
+            drawings={previewDrawing ? [...drawings, previewDrawing] : drawings}
+            selectedDrawingId={selectedDrawingId}
+          />
+          {selectedDrawingId && (
+            <button className="delete-line-btn" onClick={() => deleteDrawing(selectedDrawingId)}>
+              🗑 Delete line
+            </button>
+          )}
+          {tool !== 'none' && (
+            <div
+              className={`draw-layer ${tool === 'edit' ? 'edit' : ''}`}
+              onClick={onChartClick}
+              onMouseDown={onChartDown}
+              onMouseMove={onChartMove}
+              onMouseUp={onChartUp}
+              onMouseLeave={onChartUp}
+              title={
+                tool === 'edit'
+                  ? 'drag an endpoint to move a line'
+                  : pending
+                    ? 'click the second point'
+                    : 'click to draw'
+              }
+            />
+          )}
         </div>
 
-        <div className="side">
+        <button
+          className="panel-handle"
+          style={{ right: panelOpen ? 386 : 14 }}
+          onClick={() => setPanelOpen((o) => !o)}
+          title={panelOpen ? 'Hide panel (show full chart)' : 'Show panel'}
+        >
+          {panelOpen ? '›' : '‹'}
+        </button>
+
+        <div className={`side ${panelOpen ? '' : 'collapsed'}`}>
           <SetupPanel
-            firing={analysis?.firingSetups ?? []}
+            setups={analysis?.promotedSetups ?? []}
             diagnostics={
               analysis?.diagnostics ?? {
                 candidatesTested: 0,
@@ -120,9 +485,15 @@ export default function App() {
               }
             }
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setSelectedId(id)
+              setShowStrategy(true)
+            }}
+            onResearch={runResearch}
+            researching={researching}
             loading={loading}
           />
+          <SignalsCard ml={analysis?.ml ?? null} decay={analysis?.decay ?? []} />
           <DeskChat ctx={deskCtx} />
         </div>
       </div>

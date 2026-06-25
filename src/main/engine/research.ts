@@ -125,14 +125,28 @@ export function runResearch(candles: Candle[], symbol: string, interval: Interva
 
 // Determine which promoted setups are firing right now on the latest bar.
 export function firingFromPromoted(promoted: PromotedSetup[], candles: Candle[], symbol: string, interval: Interval) {
+  return currentFromPromoted(promoted, candles, symbol, interval).filter((f) => f.setup.firing)
+}
+
+// All promoted setups with their CURRENT levels + a firing flag, so the chart can
+// always draw markup (the selected/best setup) even when nothing is triggering now.
+export function currentFromPromoted(
+  promoted: PromotedSetup[],
+  candles: Candle[],
+  symbol: string,
+  interval: Interval
+) {
   const byId = new Map<string, SetupTemplate>()
   for (const tpl of [...libraryTemplates(), ...generatorTemplates()]) byId.set(tpl.id, tpl)
-  const firing: { setup: Setup; stats: SetupStats }[] = []
+  const out: { setup: Setup; stats: SetupStats }[] = []
   for (const p of promoted) {
     const tpl = byId.get(p.setup.id)
     if (!tpl) continue
     const fresh = currentSetup(tpl, candles, symbol, interval)
-    if (fresh.firing) firing.push({ setup: fresh, stats: p.stats })
+    out.push({ setup: fresh, stats: p.stats })
   }
-  return firing
+  // Firing first, then by out-of-sample profit factor.
+  out.sort((a, b) => Number(b.setup.firing) - Number(a.setup.firing) || b.stats.profitFactor - a.stats.profitFactor)
+  return out
 }
+

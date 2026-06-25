@@ -1,4 +1,4 @@
-import type { AssetClass, CandleSeries, Interval, SeriesMeta } from '@shared/types'
+import type { AssetClass, CandleSeries, Interval, Quote, SeriesMeta, Ticker } from '@shared/types'
 import { BinanceProvider, MarketDataProvider, YahooProvider } from './providers'
 import { candleRange, readCandles, writeCandles } from '../db'
 
@@ -13,6 +13,7 @@ export function resolveProvider(symbol: string): MarketDataProvider {
 }
 
 const INTERVAL_SECONDS: Record<Interval, number> = {
+  '1m': 60,
   '5m': 300,
   '15m': 900,
   '1h': 3600,
@@ -25,6 +26,8 @@ const INTERVAL_SECONDS: Record<Interval, number> = {
 // enough data to validate and train honestly.
 function defaultLookbackSeconds(interval: Interval): number {
   switch (interval) {
+    case '1m':
+      return 3 * 86400
     case '5m':
     case '15m':
       return 30 * 86400
@@ -80,6 +83,16 @@ export async function getSeries(symbol: string, interval: Interval): Promise<Can
   const candles = readCandles(symbol, degraded && resolution !== interval ? resolution : interval)
   const meta: SeriesMeta = { symbol, interval, source: provider.id, resolution, degraded }
   return { meta, candles }
+}
+
+export async function getQuote(symbol: string): Promise<Quote> {
+  const provider = resolveProvider(symbol)
+  return provider.getLatest(symbol)
+}
+
+export async function getTicker(symbol: string): Promise<Ticker> {
+  const provider = resolveProvider(symbol)
+  return provider.getTicker(symbol)
 }
 
 interface SearchHit {

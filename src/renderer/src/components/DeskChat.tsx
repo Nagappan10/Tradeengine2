@@ -65,11 +65,17 @@ export default function DeskChat({ ctx }: Props) {
   }, [messages, verdict, busy])
 
   const getCall = async () => {
-    if (!ctx) return
+    if (!ctx || busy) return
     setBusy(true)
-    const v = await window.desk.deskVerdict(ctx)
-    setVerdict(v)
-    setBusy(false)
+    try {
+      const v = await window.desk.deskVerdict(ctx)
+      setVerdict(v)
+    } catch (e) {
+      // Surface the failure instead of leaving the button stuck on "Thinking…".
+      setMessages((m) => [...m, { role: 'model', content: `Desk error: ${(e as Error).message}` }])
+    } finally {
+      setBusy(false)
+    }
   }
 
   const send = async () => {
@@ -79,17 +85,22 @@ export default function DeskChat({ ctx }: Props) {
     const next = [...messages, { role: 'user' as const, content: msg }]
     setMessages(next)
     setBusy(true)
-    const reply = await window.desk.deskChat(ctx, next, msg)
-    setMessages([...next, { role: 'model', content: reply }])
-    setBusy(false)
+    try {
+      const reply = await window.desk.deskChat(ctx, next, msg)
+      setMessages([...next, { role: 'model', content: reply }])
+    } catch (e) {
+      setMessages([...next, { role: 'model', content: `Desk error: ${(e as Error).message}` }])
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
-    <div className="glass">
-      <h3 className="section-title">Desk — ask anything</h3>
+    <div className="glass desk-panel">
+      <h3 className="section-title">Desk — your trading coach</h3>
 
       {!verdict ? (
-        <button style={{ width: '100%' }} onClick={getCall} disabled={!ctx || busy}>
+        <button className="primary" style={{ width: '100%' }} onClick={getCall} disabled={!ctx || busy}>
           {busy ? 'Thinking…' : 'Get Desk call'}
         </button>
       ) : (

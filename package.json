@@ -13,18 +13,21 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "rebuild": "electron-builder install-app-deps",
+    "smoke": "electron-vite build && STRATEGY_DESK_SMOKE=BTCUSDT electron ./out/main/index.js",
     "package": "electron-vite build && electron-builder install-app-deps && electron-builder"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "better-sqlite3": "^11.8.1",
-    "lightweight-charts": "^4.2.3"
+    "lightweight-charts": "^4.2.3",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.3.1",
     "electron-builder": "^25.1.8",

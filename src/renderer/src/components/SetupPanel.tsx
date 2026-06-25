@@ -2,11 +2,23 @@ import { useState } from 'react'
 import type { ResearchDiagnostics, Setup, SetupStats } from '@shared/types'
 
 interface Props {
-  firing: { setup: Setup; stats: SetupStats }[]
+  setups: { setup: Setup; stats: SetupStats }[]
   diagnostics: ResearchDiagnostics
   selectedId: string | null
   onSelect(id: string): void
+  onResearch(): void
+  researching: boolean
   loading: boolean
+}
+
+// Turn a setup into a plain sentence a beginner can act on.
+function planText(setup: Setup): string {
+  const act = setup.direction === 'long' ? 'Buy' : 'Sell'
+  if (setup.firing) {
+    return `${act} now near ${setup.entryPrice}. Get out at ${setup.stopPrice} if wrong; aim for ${setup.targetPrice}.`
+  }
+  const verb = setup.direction === 'long' ? 'dips to' : 'rises to'
+  return `Wait. If price ${verb} ${setup.entryPrice} (${setup.reasoning}), ${act.toLowerCase()}. Stop ${setup.stopPrice}, target ${setup.targetPrice}.`
 }
 
 function StatRow({ k, v }: { k: string; v: string }) {
@@ -18,13 +30,22 @@ function StatRow({ k, v }: { k: string; v: string }) {
   )
 }
 
-export default function SetupPanel({ firing, diagnostics, selectedId, onSelect, loading }: Props) {
+export default function SetupPanel({
+  setups,
+  diagnostics,
+  selectedId,
+  onSelect,
+  onResearch,
+  researching,
+  loading
+}: Props) {
   const [openStats, setOpenStats] = useState<Record<string, boolean>>({})
+  const firingCount = setups.filter((s) => s.setup.firing).length
 
   if (loading) {
     return (
       <div className="glass">
-        <h3 className="section-title">Firing setups</h3>
+        <h3 className="section-title">Setups</h3>
         <div className="shimmer" style={{ width: '70%' }} />
         <div className="shimmer" style={{ width: '90%' }} />
         <div className="shimmer" style={{ width: '50%' }} />
@@ -34,11 +55,18 @@ export default function SetupPanel({ firing, diagnostics, selectedId, onSelect, 
 
   return (
     <div className="glass">
-      <h3 className="section-title">Firing setups</h3>
+      <div className="panel-head">
+        <h3 className="section-title" style={{ margin: 0 }}>
+          Setups {setups.length > 0 ? `· ${firingCount} firing` : ''}
+        </h3>
+        <button className="tiny" onClick={onResearch} disabled={researching}>
+          {researching ? 'Researching…' : '⟳ Run research'}
+        </button>
+      </div>
 
-      {firing.length === 0 ? (
+      {setups.length === 0 ? (
         <div className="diag">
-          <p style={{ marginTop: 0 }}>No setups firing right now.</p>
+          <p style={{ marginTop: 0 }}>No validated setups for this symbol/timeframe yet.</p>
           <StatRow k="candidates tested" v={String(diagnostics.candidatesTested)} />
           <StatRow k="failed (no entry trigger)" v={String(diagnostics.failedNoEntryTrigger)} />
           <StatRow k="failed in-sample" v={String(diagnostics.failedInSample)} />
@@ -46,13 +74,11 @@ export default function SetupPanel({ firing, diagnostics, selectedId, onSelect, 
           <StatRow k="flagged overfit (withheld)" v={String(diagnostics.flaggedOverfit)} />
           <StatRow k="promoted (validated)" v={String(diagnostics.promoted)} />
           <p style={{ color: 'var(--bone-dim)', marginBottom: 0 }}>
-            {diagnostics.promoted > 0
-              ? 'Validated setups exist but none are triggering on the latest bar — wait for price to reach a zone.'
-              : 'Nothing survived out-of-sample validation on this data. Try a longer timeframe (Daily) for more history.'}
+            Nothing survived out-of-sample validation on this data. Try Daily for more history, or hit Run research.
           </p>
         </div>
       ) : (
-        firing.map(({ setup, stats }) => {
+        setups.map(({ setup, stats }, rank) => {
           const open = !!openStats[setup.id]
           return (
             <div
@@ -61,14 +87,26 @@ export default function SetupPanel({ firing, diagnostics, selectedId, onSelect, 
               onClick={() => onSelect(setup.id)}
             >
               <div className="setup-head">
-                <strong>{setup.name}</strong>
+                <strong>
+                  {rank === 0 && <span className="best-badge">★ BEST</span>}
+                  {setup.firing && <span style={{ color: 'var(--bull)' }}>● </span>}
+                  {setup.name}
+                </strong>
                 <span className={`dir ${setup.direction}`}>{setup.direction.toUpperCase()}</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--bone-dim)', margin: '2px 0 6px' }}>{setup.reasoning}</div>
+              <div style={{ fontSize: 10, color: 'var(--bone-dim)' }}>
+                #{rank + 1} · won {(stats.winRate * 100).toFixed(0)}% of {stats.sampleSize} past trades · R:R 1:{setup.riskReward}
+              </div>
+
+              {/* Plain-English plan with a clear WAIT / ENTER NOW status. */}
+              <div className={`plan ${setup.firing ? 'firing' : ''}`}>
+                <span className="plan-status">{setup.firing ? '● ENTER NOW' : '○ WAIT'}</span>
+                <span className="plan-text">{planText(setup)}</span>
+              </div>
+
               <StatRow k="entry" v={String(setup.entryPrice)} />
-              <StatRow k="stop" v={String(setup.stopPrice)} />
-              <StatRow k="target" v={String(setup.targetPrice)} />
-              <StatRow k="R:R" v={`1:${setup.riskReward}`} />
+              <StatRow k="stop (max loss)" v={String(setup.stopPrice)} />
+              <StatRow k="target (goal)" v={String(setup.targetPrice)} />
 
               <button
                 style={{ marginTop: 8, width: '100%' }}

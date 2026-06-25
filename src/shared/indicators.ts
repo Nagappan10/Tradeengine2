@@ -1,4 +1,4 @@
-import type { Candle } from '@shared/types'
+import type { Candle } from './types'
 
 export function sma(values: number[], period: number): (number | null)[] {
   const out: (number | null)[] = new Array(values.length).fill(null)

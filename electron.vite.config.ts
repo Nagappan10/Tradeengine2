@@ -27,6 +27,9 @@ export default defineConfig({
     resolve: {
       alias: { '@shared': resolve('src/shared') }
     },
+    define: {
+      __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC')
+    },
     plugins: [react()],
     build: {
       rollupOptions: {

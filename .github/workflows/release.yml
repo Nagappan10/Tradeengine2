@@ -1,0 +1,60 @@
+name: Build Windows installer
+
+# Builds a double-click Windows installer (.exe) on a real Windows runner and
+# uploads it as a downloadable artifact. Trigger by pushing a v* tag, or run it
+# manually from the Actions tab (Run workflow).
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'claude/zealous-ptolemy-vnu20o'
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (renderer + main + preload)
+        run: npm run build
+
+      - name: Package NSIS installer
+        run: npx --no-install electron-builder --win nsis --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StrategyDesk-Windows-Installer
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+          if-no-files-found: error
+
+      # Publish a permanent GitHub Release with the installer attached, so there's
+      # a stable download link that doesn't expire like a 90-day artifact.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: win-build-${{ github.run_number }}
+          name: Strategy Desk (Windows) build ${{ github.run_number }}
+          body: |
+            Windows installer for Strategy Desk, built from `${{ github.sha }}`.
+            Download `Strategy.Desk.Setup.*.exe` below. It's unsigned — on SmartScreen choose **More info → Run anyway**.
+          files: |
+            release/*.exe
+          fail_on_unmatched_files: true

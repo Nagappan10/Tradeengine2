@@ -3,7 +3,7 @@
 
 export type AssetClass = 'crypto' | 'stock' | 'forex' | 'commodity' | 'index'
 
-export type Interval = '5m' | '15m' | '1h' | '4h' | '1d' | '1w'
+export type Interval = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w'
 
 export interface Candle {
   time: number // unix seconds (UTC)
@@ -18,6 +18,12 @@ export interface Quote {
   symbol: string
   price: number
   time: number
+}
+
+export interface Ticker {
+  symbol: string
+  price: number
+  changePct: number // % change over the lookback (24h crypto / prev close equities)
 }
 
 export interface SeriesMeta {
@@ -50,6 +56,16 @@ export interface Zone {
   touches: number
   recencyBars: number // bars since last touch (smaller = fresher)
   strength: number // 0..1 score
+}
+
+// A diagonal trendline fitted through swing lows (support) or highs (resistance).
+export interface Trendline {
+  kind: 'support' | 'resistance'
+  t1: number
+  p1: number
+  t2: number
+  p2: number
+  touches: number
 }
 
 // ---------- Setups: concrete, testable trade objects ----------
@@ -223,6 +239,11 @@ export interface DeskContext {
 export interface AppSettings {
   geminiApiKey: string // masked when returned to renderer
   geminiModel: string
+  groqApiKey: string
+  groqModel: string
+  openrouterApiKey: string
+  openrouterModel: string
+  deskProvider: 'gemini' | 'groq' | 'openrouter'
   alpacaKey: string
   alpacaSecret: string
   twelveDataKey: string
@@ -230,8 +251,13 @@ export interface AppSettings {
   theme: 'dark' | 'light'
 }
 
-export type MaskedSettings = Omit<AppSettings, 'geminiApiKey' | 'alpacaSecret' | 'twelveDataKey'> & {
+export type MaskedSettings = Omit<
+  AppSettings,
+  'geminiApiKey' | 'groqApiKey' | 'openrouterApiKey' | 'alpacaSecret' | 'twelveDataKey'
+> & {
   hasGeminiKey: boolean
+  hasGroqKey: boolean
+  hasOpenrouterKey: boolean
   hasAlpacaKey: boolean
   hasTwelveDataKey: boolean
 }
@@ -243,7 +269,9 @@ export interface SymbolAnalysis {
   candles: Candle[]
   zones: Zone[]
   swings: Swing[]
+  trendlines: Trendline[]
   firingSetups: { setup: Setup; stats: SetupStats }[]
+  promotedSetups: { setup: Setup; stats: SetupStats }[]
   diagnostics: ResearchDiagnostics
   ml: MlSignal
   decay: DecayStatus[]
@@ -254,11 +282,17 @@ export interface SymbolAnalysis {
 export interface DeskBridge {
   searchSymbols(query: string): Promise<{ symbol: string; name: string; assetClass: AssetClass; source: string }[]>
   getCandles(symbol: string, interval: Interval): Promise<CandleSeries>
+  getQuote(symbol: string): Promise<Quote>
+  getTicker(symbol: string): Promise<Ticker>
+  subscribeStream(symbol: string, interval: Interval): Promise<boolean>
+  unsubscribeStream(): Promise<void>
+  onStreamCandle(cb: (candle: Candle, closed: boolean) => void): () => void
   analyze(symbol: string, interval: Interval): Promise<SymbolAnalysis>
   runResearch(symbol: string, interval: Interval): Promise<ResearchRun>
   getPromoted(): Promise<PromotedSetup[]>
   deskVerdict(ctx: DeskContext): Promise<DeskVerdict>
   deskChat(ctx: DeskContext, history: ChatMessage[], message: string): Promise<string>
+  testDesk(): Promise<{ ok: boolean; message: string }>
   getSettings(): Promise<MaskedSettings>
   saveSettings(patch: Partial<AppSettings>): Promise<MaskedSettings>
 }

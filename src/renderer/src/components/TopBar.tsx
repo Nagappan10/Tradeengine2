@@ -16,7 +16,7 @@ interface Props {
   onOpenSettings(): void
 }
 
-const INTERVALS: Interval[] = ['15m', '1h', '4h', '1d', '1w']
+const INTERVALS: Interval[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w']
 
 export default function TopBar({
   symbol,
@@ -30,7 +30,24 @@ export default function TopBar({
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<Hit[]>([])
   const [open, setOpen] = useState(false)
+  const [ist, setIst] = useState('')
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const tick = () =>
+      setIst(
+        new Date().toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        })
+      )
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -94,6 +111,14 @@ export default function TopBar({
       </div>
 
       <div className="spacer" />
+
+      <span className="ist-clock mono" title="India Standard Time (live)">
+        🇮🇳 IST {ist}
+      </span>
+
+      <span className="build-tag mono" title="Build version — compare with the GitHub Release you installed">
+        v3.0 · {__APP_BUILD__}
+      </span>
 
       <button onClick={onToggleTheme} title="Toggle theme">
         {theme === 'dark' ? '☾ dark' : '☀ light'}

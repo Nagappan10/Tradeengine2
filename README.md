@@ -49,6 +49,19 @@ npm run package     # builds + electron-builder for your current OS
 
 Outputs to `release/` (AppImage on Linux, dmg on macOS, nsis on Windows).
 
+#### Windows installer via CI (no local toolchain needed)
+
+A Windows `.exe` installer is built on a real Windows runner by the
+**Build Windows installer** GitHub Action (`.github/workflows/release.yml`):
+
+1. Push a tag like `v3.0.0`, or open the repo's **Actions** tab → *Build Windows
+   installer* → **Run workflow**.
+2. When it finishes, open the run and download the
+   **StrategyDesk-Windows-Installer** artifact (a zip containing
+   `Strategy Desk Setup <version>.exe`).
+3. Unzip and run the installer. (It's unsigned, so Windows SmartScreen may warn —
+   choose *More info → Run anyway*.)
+
 ## Where keys & data live
 
 - **Keys** (Gemini, optional Alpaca / Twelve Data) are entered in **Settings**
@@ -82,7 +95,9 @@ Outputs to `release/` (AppImage on Linux, dmg on macOS, nsis on Windows).
    candidates were tested, how many failed in-sample / out-of-sample / had no
    entry trigger, and how many were **flagged overfit and withheld**. When zero
    setups fire, the panel shows these diagnostics so the empty state is explained.
-6. **Desk** — Gemini Flash with Search grounding. First message is the structured
+6. **Desk** — pick the provider in Settings: **Gemini** Flash (with Google Search
+   grounding) or **Groq** (free, very fast, OpenAI-compatible, no web search).
+   First message is the structured
    YES/NO/WAIT verdict (separating historical edge from current read); after that
    it's a chat — ask "why short here?", "what invalidates this?" — with the full
    context (symbol, firing setups + OOS stats, S/R levels, timeframe, ML note)
@@ -116,5 +131,6 @@ to daily and says so on the chart badge. Source + resolution are shown everywher
 
 - Alpaca and Twelve Data adapters are scaffolded via Settings keys but the app
   works keyless on Binance + Yahoo out of the box.
-- Gemini model defaults to `gemini-2.0-flash` (configurable in Settings).
+- Gemini model defaults to `gemini-2.5-flash` (configurable in Settings;
+  `gemini-2.0-flash` offers higher free-tier throughput if you hit rate limits).
 - Walk-forward is approximated by the IS/OOS split + the rolling decay window.
